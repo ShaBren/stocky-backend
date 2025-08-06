@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - stocky_data:/app/data
+    env_file:
+      - .env
+
+volumes:
+  stocky_data:
+

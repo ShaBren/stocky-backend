@@ -1,0 +1,28 @@
+[project]
+name = "stocky-backend"
+version = "0.1.0"
+authors = [
+    { name = "Stephen Bryant", email = "stephen@stephenbryant.net" },
+]
+description = "A home kitchen inventory management system."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "alembic",
+    "pydantic",
+    "pydantic-settings",
+    "passlib[bcrypt]",
+    "python-jose[cryptography]",
+    "websockets",
+    "httpx",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg2-binary"]
+dev = ["pytest", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
