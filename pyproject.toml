@@ -17,6 +17,8 @@ dependencies = [
     "python-jose[cryptography]",
     "websockets",
     "httpx",
+    "email-validator",
+    "python-multipart",
 ]
 
 [project.optional-dependencies]
