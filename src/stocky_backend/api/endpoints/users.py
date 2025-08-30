@@ -11,7 +11,7 @@ from ...core.security import (
     get_current_active_user, 
     require_admin
 )
-from ...crud.crud import UserCRUD
+from ...crud.crud import UserCRUD, LogEntryCRUD
 from ...schemas.schemas import (
     UserCreate, 
     UserUpdate, 
@@ -60,6 +60,16 @@ async def create_user(
     
     # Create user
     user = user_crud.create(db, obj_in=user_data)
+    # Log creation
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"User created: {user.username} (ID: {user.id})",
+        "level": "INFO",
+        "module": "users",
+        "function": "create_user",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return UserResponse.model_validate(user)
 
 
@@ -136,9 +146,25 @@ async def update_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+    # Compare changes BEFORE update
+    changes = {}
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(db_user, field, None)
+        if value != old_value:
+            changes[field] = {"old": old_value, "new": value}
     updated_user = user_crud.update(db, db_obj=db_user, obj_in=user_update)
-    
+    # Log update
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"User updated: {updated_user.username} (ID: {updated_user.id})",
+        "level": "INFO",
+        "module": "users",
+        "function": "update_user",
+        "user_id": current_user.id,
+        "extra_data": {"changes": changes}
+    }
+    log_crud.create(db, obj_in=log_entry)
     return UserResponse.model_validate(updated_user)
 
 
@@ -157,6 +183,16 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
     
+    user = user_crud.get(db, user_id)
     user_crud.remove(db, id=user_id)
-    
+    # Log deletion
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"User deleted: {user.username} (ID: {user.id})",
+        "level": "INFO",
+        "module": "users",
+        "function": "delete_user",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return {"message": "User deactivated successfully"}

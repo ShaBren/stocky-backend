@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...db.database import get_db
-from ...crud.crud import ItemCRUD
+from ...crud.crud import ItemCRUD, LogEntryCRUD
 from ...schemas.schemas import ItemCreate, ItemUpdate, ItemResponse
 from ...core.security import require_user_role
+from ...models.models import LogEntry
 
 router = APIRouter()
 item_crud = ItemCRUD()
@@ -41,6 +42,16 @@ async def create_item(
             )
     
     db_item = item_crud.create(db, obj_in=item, created_by_id=current_user.id)
+    # Log creation
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"Item created: {db_item.name} (ID: {db_item.id})",
+        "level": "INFO",
+        "module": "items",
+        "function": "create_item",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return db_item
 
 @router.get("/search", response_model=List[ItemResponse])
@@ -74,7 +85,6 @@ async def update_item(
     db: Session = Depends(get_db),
     current_user = Depends(require_user_role("manager"))
 ):
-    """Update an existing item"""
     db_item = item_crud.get(db, id=item_id)
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -88,7 +98,25 @@ async def update_item(
                 detail=f"Item with UPC {item_update.upc} already exists"
             )
     
+    # Compare changes BEFORE update
+    changes = {}
+    update_data = item_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(db_item, field, None)
+        if value != old_value:
+            changes[field] = {"old": old_value, "new": value}
     updated_item = item_crud.update(db, db_obj=db_item, obj_in=item_update)
+    # Log update with details
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"Item updated: {updated_item.name} (ID: {updated_item.id})",
+        "level": "INFO",
+        "module": "items",
+        "function": "update_item",
+        "user_id": current_user.id,
+        "extra_data": {"changes": changes}
+    }
+    log_crud.create(db, obj_in=log_entry)
     return updated_item
 
 @router.delete("/{item_id}")
@@ -101,8 +129,25 @@ async def delete_item(
     db_item = item_crud.get(db, id=item_id)
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
-    
+
+    # Check for related SKUs
+    from ...crud.crud import SKUCRUD
+    sku_crud = SKUCRUD()
+    related_skus = sku_crud.get_by_item(db, item_id)
+    if related_skus:
+        raise HTTPException(status_code=409, detail="Cannot delete item: SKUs exist for this item.")
+
     item_crud.remove(db, id=item_id)
+    # Log deletion
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"Item deleted: {db_item.name} (ID: {db_item.id})",
+        "level": "INFO",
+        "module": "items",
+        "function": "delete_item",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return {"message": "Item deleted successfully"}
 
 @router.get("/upc/{upc}", response_model=ItemResponse)

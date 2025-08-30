@@ -33,8 +33,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     ) -> List[ModelType]:
         return db.query(self.model).offset(skip).limit(limit).all()
 
-    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
-        obj_data = obj_in.model_dump()
+    def create(self, db: Session, *, obj_in: CreateSchemaType | dict) -> ModelType:
+        if hasattr(obj_in, 'model_dump'):
+            obj_data = obj_in.model_dump()
+        elif isinstance(obj_in, dict):
+            obj_data = obj_in
+        else:
+            raise TypeError("obj_in must be a Pydantic model or dict")
         db_obj = self.model(**obj_data)
         db.add(db_obj)
         db.commit()

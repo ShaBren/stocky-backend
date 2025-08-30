@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...db.database import get_db
-from ...crud.crud import SKUCRUD
+from ...crud.crud import SKUCRUD, LogEntryCRUD
 from ...schemas.schemas import SKUCreate, SKUUpdate, SKUResponse, SKUQuantityUpdate
 from ...core.security import require_user_role
 
@@ -50,6 +50,16 @@ async def create_sku(
         )
     
     db_sku = sku_crud.create(db, obj_in=sku, created_by_id=current_user.id)
+    # Log creation
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"SKU created: Item {db_sku.item_id} at Location {db_sku.location_id} (ID: {db_sku.id})",
+        "level": "INFO",
+        "module": "skus",
+        "function": "create_sku",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return db_sku
 
 @router.get("/search", response_model=List[SKUResponse])
@@ -88,7 +98,25 @@ async def update_sku(
     if not db_sku:
         raise HTTPException(status_code=404, detail="SKU not found")
     
+    # Compare changes BEFORE update
+    changes = {}
+    update_data = sku_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(db_sku, field, None)
+        if value != old_value:
+            changes[field] = {"old": old_value, "new": value}
     updated_sku = sku_crud.update(db, db_obj=db_sku, obj_in=sku_update)
+    # Log update
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"SKU updated: Item {updated_sku.item_id} at Location {updated_sku.location_id} (ID: {updated_sku.id})",
+        "level": "INFO",
+        "module": "skus",
+        "function": "update_sku",
+        "user_id": current_user.id,
+        "extra_data": {"changes": changes}
+    }
+    log_crud.create(db, obj_in=log_entry)
     return updated_sku
 
 @router.put("/{sku_id}/quantity", response_model=SKUResponse)
@@ -119,6 +147,16 @@ async def delete_sku(
         raise HTTPException(status_code=404, detail="SKU not found")
     
     sku_crud.remove(db, id=sku_id)
+    # Log deletion
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"SKU deleted: Item {db_sku.item_id} at Location {db_sku.location_id} (ID: {db_sku.id})",
+        "level": "INFO",
+        "module": "skus",
+        "function": "delete_sku",
+        "user_id": current_user.id
+    }
+    log_crud.create(db, obj_in=log_entry)
     return {"message": "SKU deleted successfully"}
 
 @router.get("/low-stock/", response_model=List[SKUResponse])
