@@ -1,41 +1,36 @@
-# Stage 1: Build stage
-FROM python:3.11-slim as builder
+# Use Python 3.13 slim image
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install uv for dependency management
-RUN pip install uv
-
-# Copy dependency files and install dependencies
-COPY pyproject.toml ./
-RUN uv pip install --system --no-cache --no-deps -p pyproject.toml
-
-# Copy the application source code
-COPY ./src ./src
-
-
-# Stage 2: Final production stage
-FROM python:3.11-slim
-
-WORKDIR /app
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for security
-RUN useradd --create-home appuser
+RUN useradd --create-home --shell /bin/bash appuser
+
+# Copy source code first
+COPY ./src ./src
+COPY ./alembic ./alembic
+COPY ./alembic.ini ./alembic.ini
+COPY ./scripts ./scripts
+COPY ./docker-entrypoint.sh ./docker-entrypoint.sh
+COPY pyproject.toml ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
+
+# Create necessary directories and fix permissions
+RUN mkdir -p /app/data && chown -R appuser:appuser /app && chmod 755 /app/data
+
+# Switch to non-root user
 USER appuser
-
-# Copy installed dependencies from the builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Copy the application source code
-COPY --chown=appuser:appuser ./src ./src
-
-# Create a volume for the SQLite database
-VOLUME /app/data
 
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "stocky.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set entrypoint
+ENTRYPOINT ["./docker-entrypoint.sh"]
 
