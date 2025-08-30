@@ -65,22 +65,29 @@ def verify_token(token: str) -> Dict[str, Any]:
 def create_token_response(user_id: int, username: str, role: UserRole) -> Dict[str, Any]:
     """Create a complete token response"""
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+    refresh_token_expires = timedelta(days=7)
+
     token_data = {
         "sub": str(user_id),
         "username": username,
         "role": role,
     }
-    
+
     access_token = create_access_token(
         data=token_data,
         expires_delta=access_token_expires
     )
-    
+
+    refresh_token = create_access_token(
+        data={"sub": str(user_id), "type": "refresh"},
+        expires_delta=refresh_token_expires
+    )
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
         "user_id": user_id,
         "role": role,
+        "refresh_token": refresh_token,
     }

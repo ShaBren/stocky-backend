@@ -131,8 +131,27 @@ async def update_quantity(
     if not db_sku:
         raise HTTPException(status_code=404, detail="SKU not found")
     
+    # Compare quantity BEFORE update
+    changes = {}
+    old_quantity = db_sku.quantity
+    new_quantity = quantity_update.quantity
+    if old_quantity != new_quantity:
+        changes["quantity"] = {"old": old_quantity, "new": new_quantity}
+
     # Update only the quantity field
-    updated_sku = sku_crud.update_quantity(db, sku_id=sku_id, new_quantity=quantity_update.quantity)
+    updated_sku = sku_crud.update_quantity(db, sku_id=sku_id, new_quantity=new_quantity)
+
+    # Log quantity update
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"SKU quantity updated: Item {updated_sku.item_id} at Location {updated_sku.location_id} (ID: {updated_sku.id})",
+        "level": "INFO",
+        "module": "skus",
+        "function": "update_quantity",
+        "user_id": current_user.id,
+        "extra_data": {"changes": changes}
+    }
+    log_crud.create(db, obj_in=log_entry)
     return updated_sku
 
 @router.delete("/{sku_id}")

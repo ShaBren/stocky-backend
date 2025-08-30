@@ -4,7 +4,6 @@ Pydantic schemas for API request/response models
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
-from enum import Enum
 
 from ..models.models import UserRole, StorageType
 
@@ -23,6 +22,7 @@ class Token(BaseModel):
     expires_in: int
     user_id: int
     role: UserRole
+    refresh_token: str
 
 
 class TokenData(BaseModel):
@@ -142,6 +142,7 @@ class SKUUpdate(BaseModel):
     expiry_date: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=1000)
     is_active: Optional[bool] = None
+    location_id: Optional[int] = None
 
 
 class SKUResponse(BaseSchema):

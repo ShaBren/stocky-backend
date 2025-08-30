@@ -1,15 +1,55 @@
+
+"""
+Authentication endpoints
+"""
 """
 Authentication endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-
 from ...db.database import get_db
 from ...models.models import User
-from ...core.auth import verify_password, create_token_response, generate_api_key
+from ...core.auth import verify_password, create_token_response, generate_api_key, verify_token
 from ...core.security import get_current_active_user
 from ...schemas.schemas import Token, LoginRequest, UserResponse
+
+router = APIRouter()
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+    """Refresh access token using a valid refresh token"""
+    try:
+        payload = verify_token(refresh_token)
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=400, detail="Invalid refresh token type")
+        user_id = int(payload.get("sub"))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    token_response = create_token_response(user.id, user.username, user.role)
+    return Token(**token_response)
+@router.post("/refresh", response_model=Token)
+async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+    """Refresh access token using a valid refresh token"""
+    try:
+        payload = verify_token(refresh_token)
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=400, detail="Invalid refresh token type")
+        user_id = int(payload.get("sub"))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    token_response = create_token_response(user.id, user.username, user.role)
+    return Token(**token_response)
 
 router = APIRouter()
 
