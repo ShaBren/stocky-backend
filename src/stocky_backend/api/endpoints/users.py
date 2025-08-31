@@ -34,7 +34,7 @@ async def list_users(
     return [UserResponse.model_validate(user) for user in users]
 
 
-@router.post("/", response_model=UserResponse)
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
     current_user: User = Depends(require_admin),

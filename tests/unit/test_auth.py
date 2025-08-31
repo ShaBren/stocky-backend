@@ -217,13 +217,14 @@ class TestTokenVerification:
     """Test JWT token verification and user extraction."""
     
     @patch('src.stocky_backend.core.auth.jwt')
-    @patch('src.stocky_backend.crud.crud.user.get_by_username')
+    @patch('src.stocky_backend.crud.crud.user.get')
     def test_verify_valid_token(self, mock_get_user, mock_jwt, db_session):
         """Test verification of valid JWT token."""
         # Given
+        user_id = 123
         username = "testuser"
-        mock_jwt.decode.return_value = {"sub": username}
-        user = UserFactory.create(username=username, is_active=True)
+        mock_jwt.decode.return_value = {"sub": str(user_id), "username": username}
+        user = UserFactory.create(id=user_id, username=username, is_active=True)
         mock_get_user.return_value = user
         
         # When
@@ -232,7 +233,7 @@ class TestTokenVerification:
         # Then
         assert result == user
         mock_jwt.decode.assert_called_once()
-        mock_get_user.assert_called_once_with(db_session, username=username)
+        mock_get_user.assert_called_once_with(db_session, id=user_id)
     
     @patch('src.stocky_backend.core.auth.jwt')
     def test_verify_invalid_token(self, mock_jwt, db_session):
@@ -282,10 +283,14 @@ class TestCurrentUserExtraction:
     async def test_get_current_user_with_valid_token(self, db_session):
         """Test extracting current user from valid token."""
         # Given
-        user = UserFactory.create(username="testuser", is_active=True)
+        user_id = 123
+        user = UserFactory.create(id=user_id, username="testuser", is_active=True)
         
-        with patch('src.stocky_backend.core.auth.verify_token') as mock_verify:
-            mock_verify.return_value = user
+        with patch('src.stocky_backend.core.auth.verify_token_payload') as mock_verify_payload, \
+             patch('src.stocky_backend.crud.crud.user.get') as mock_get_user:
+            
+            mock_verify_payload.return_value = {"sub": str(user_id), "username": "testuser"}
+            mock_get_user.return_value = user
             
             # When
             current_user = await get_current_user(

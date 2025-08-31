@@ -126,23 +126,38 @@ async def get_current_user(db: Session, token: str) -> "User":
     
     try:
         payload = verify_token_payload(token)
+        
+        # Try to get user by ID first (preferred method)
+        user_id = payload.get("sub")
+        if user_id:
+            try:
+                user = crud.user.get(db, id=int(user_id))
+                if user:
+                    if not user.is_active:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Inactive user"
+                        )
+                    return user
+            except (ValueError, TypeError):
+                pass
+        
+        # Fall back to username lookup
         username: str = payload.get("username")
-        if username is None:
-            raise credentials_exception
+        if username:
+            user = crud.user.get_by_username(db, username=username)
+            if user:
+                if not user.is_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Inactive user"
+                    )
+                return user
+        
+        raise credentials_exception
+        
     except JWTError:
         raise credentials_exception
-    
-    user = crud.user.get_by_username(db, username=username)
-    if user is None:
-        raise credentials_exception
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    
-    return user
 
 
 def verify_token_simple(token: str) -> Optional[Dict[str, Any]]:
@@ -169,9 +184,20 @@ def verify_token(token: str, db: Session = None) -> Optional["User"]:
     if not payload:
         return None
     
-    username = payload.get("username")
-    if not username:
-        return None
+    # Try to get user by ID first (preferred method)
+    user_id = payload.get("sub")
+    if user_id:
+        try:
+            user = crud.user.get(db, id=int(user_id))
+            if user:
+                return user
+        except (ValueError, TypeError):
+            pass
     
-    user = crud.user.get_by_username(db, username=username)
-    return user
+    # Fall back to username lookup
+    username = payload.get("username")
+    if username:
+        user = crud.user.get_by_username(db, username=username)
+        return user
+    
+    return None

@@ -21,7 +21,7 @@ class TestUserManagementWorkflow:
             "username": "newuser",
             "email": "newuser@example.com",
             "password": "newpassword123",
-            "role": "MEMBER"
+            "role": "member"
         }
         
         create_response = await async_client.post(
@@ -57,7 +57,7 @@ class TestUserManagementWorkflow:
         user_headers = {"Authorization": f"Bearer {user_token}"}
         
         profile_response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=user_headers
         )
         
@@ -73,7 +73,7 @@ class TestUserManagementWorkflow:
         }
         
         update_response = await async_client.put(
-            "/api/v1/users/me",
+            f"/api/v1/users/{user_id}",
             json=update_data,
             headers=user_headers
         )
@@ -84,7 +84,7 @@ class TestUserManagementWorkflow:
         
         # Step 5: Verify changes persist
         final_profile_response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=user_headers
         )
         
@@ -106,7 +106,7 @@ class TestUserManagementWorkflow:
             "username": "tempuser",
             "email": "temp@example.com",
             "password": "temppassword123",
-            "role": "MEMBER"
+            "role": "member"
         }
         
         create_response = await async_client.post(
@@ -136,7 +136,7 @@ class TestUserManagementWorkflow:
         
         # Step 3: User can access their data
         profile_response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=user_headers
         )
         assert profile_response.status_code == 200
@@ -165,7 +165,7 @@ class TestUserManagementWorkflow:
         # Step 6: Existing token should be invalidated (if token validation checks user status)
         # Note: This depends on implementation - some systems invalidate tokens, others don't
         profile_response_after = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=user_headers
         )
         # This might be 401 or 403 depending on implementation
@@ -186,7 +186,7 @@ class TestUserManagementWorkflow:
                 "username": f"user{i}",
                 "email": f"user{i}@example.com",
                 "password": f"password{i}",
-                "role": "MEMBER"
+                "role": "member"
             }
             for i in range(1, 4)
         ]
@@ -219,7 +219,7 @@ class TestUserManagementWorkflow:
         # Step 3: Admin updates a user
         user_to_update_id = created_user_ids[0]
         update_data = {
-            "role": "ADMIN"
+            "role": "admin"
         }
         
         update_response = await async_client.put(
@@ -230,7 +230,7 @@ class TestUserManagementWorkflow:
         
         assert update_response.status_code == 200
         updated_user = update_response.json()
-        assert updated_user["role"] == "ADMIN"
+        assert updated_user["role"] == "admin"
         
         # Step 4: Admin deletes a user
         user_to_delete_id = created_user_ids[1]
@@ -275,7 +275,7 @@ class TestPermissionWorkflows:
             "username": "unauthorizeduser",
             "email": "unauthorized@example.com",
             "password": "password123",
-            "role": "MEMBER"
+            "role": "member"
         }
         
         create_response = await async_client.post(
@@ -314,7 +314,7 @@ class TestPermissionWorkflows:
         
         # Step 1: User can access their own data
         own_data_response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=auth_headers_user
         )
         
@@ -323,11 +323,12 @@ class TestPermissionWorkflows:
         assert own_data["username"] == regular_user.username
         
         # Step 2: User can update their own data
+        user_id = own_data["id"]
         update_data = {
         }
         
         update_response = await async_client.put(
-            "/api/v1/users/me",
+            f"/api/v1/users/{user_id}",
             json=update_data,
             headers=auth_headers_user
         )
@@ -337,11 +338,11 @@ class TestPermissionWorkflows:
         
         # Step 3: User cannot update their own role (security restriction)
         role_update_data = {
-            "role": "ADMIN"
+            "role": "admin"
         }
         
         role_update_response = await async_client.put(
-            "/api/v1/users/me",
+            f"/api/v1/users/{user_id}",
             json=role_update_data,
             headers=auth_headers_user
         )
@@ -350,7 +351,7 @@ class TestPermissionWorkflows:
         if role_update_response.status_code == 200:
             # If the request succeeds, verify role wasn't actually changed
             profile_response = await async_client.get(
-                "/api/v1/users/me",
+                "/api/v1/auth/me",
                 headers=auth_headers_user
             )
             profile_data = profile_response.json()

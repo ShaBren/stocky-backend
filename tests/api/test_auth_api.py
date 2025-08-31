@@ -154,10 +154,10 @@ class TestProtectedEndpoints:
         """Test accessing protected endpoint with valid token."""
         # When
         response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=auth_headers_user
         )
-        
+
         # Then
         assert response.status_code == 200
         data = response.json()
@@ -171,13 +171,13 @@ class TestProtectedEndpoints:
     ):
         """Test accessing protected endpoint without token."""
         # When
-        response = await async_client.get("/api/v1/users/me")
+        response = await async_client.get("/api/v1/auth/me")
         
         # Then
         assert response.status_code == 401
         data = response.json()
         assert "detail" in data
-        assert "Not authenticated" in data["detail"]
+        assert "Authentication required" in data["detail"]
     
     @pytest.mark.asyncio
     async def test_access_protected_endpoint_with_invalid_token(
@@ -190,7 +190,7 @@ class TestProtectedEndpoints:
         
         # When
         response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=headers
         )
         
@@ -210,7 +210,7 @@ class TestProtectedEndpoints:
         
         # When
         response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=headers
         )
         
@@ -302,7 +302,7 @@ class TestRoleBasedAccess:
         assert response.status_code == 403
         data = response.json()
         assert "detail" in data
-        assert "Not enough permissions" in data["detail"]
+        assert "Access denied" in data["detail"]
     
     @pytest.mark.asyncio
     async def test_user_access_to_own_data(
@@ -313,7 +313,7 @@ class TestRoleBasedAccess:
         """Test user can access their own data."""
         # When
         response = await async_client.get(
-            "/api/v1/users/me",
+            "/api/v1/auth/me",
             headers=auth_headers_user
         )
         
