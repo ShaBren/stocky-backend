@@ -266,3 +266,12 @@ class LogEntryCRUD(CRUDBase[LogEntry, None, None]):
         return db.query(LogEntry).filter(
             LogEntry.action == action
         ).order_by(LogEntry.timestamp.desc()).offset(skip).limit(limit).all()
+
+
+# Create CRUD instances
+user = UserCRUD()
+item = ItemCRUD()
+location = LocationCRUD()
+sku = SKUCRUD()
+alert = AlertCRUD()
+log = LogEntryCRUD()

@@ -1,0 +1,201 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: stocky_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r tests/requirements-test.txt
+
+    - name: Lint with flake8
+      run: |
+        # Install flake8
+        pip install flake8
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Type checking with mypy
+      run: |
+        pip install mypy
+        mypy src/ --ignore-missing-imports
+
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --cov=src/stocky_backend --cov-report=xml --cov-report=term-missing
+
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --cov=src/stocky_backend --cov-append --cov-report=xml --cov-report=term-missing
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stocky_test
+
+    - name: Run API tests
+      run: |
+        pytest tests/api/ -v --cov=src/stocky_backend --cov-append --cov-report=xml --cov-report=term-missing
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stocky_test
+
+    - name: Run E2E tests
+      run: |
+        pytest tests/e2e/ -v --cov=src/stocky_backend --cov-append --cov-report=xml --cov-report=term-missing
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stocky_test
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+    - name: Generate coverage report
+      run: |
+        pip install coverage
+        coverage report --show-missing
+        coverage html
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report-${{ matrix.python-version }}
+        path: htmlcov/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install safety bandit
+
+    - name: Security scan with safety
+      run: |
+        safety check
+
+    - name: Security scan with bandit
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        bandit -r src/
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: bandit-report.json
+
+  docker-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t stocky-backend:test .
+
+    - name: Test Docker image
+      run: |
+        # Start the container
+        docker run -d --name stocky-test -p 8000:8000 stocky-backend:test
+        
+        # Wait for the container to be ready
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8000/health || exit 1
+        
+        # Test API endpoint
+        curl -f http://localhost:8000/api/v1/docs || exit 1
+        
+        # Stop the container
+        docker stop stocky-test
+        docker rm stocky-test
+
+  performance-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r tests/requirements-test.txt
+        pip install locust
+
+    - name: Run performance tests
+      run: |
+        # Run a basic load test
+        pytest tests/ -m "slow" -v --tb=short
+
+    - name: Performance regression check
+      run: |
+        # Run benchmark tests if they exist
+        pytest tests/ -k "benchmark" --benchmark-only --benchmark-json=benchmark.json || echo "No benchmark tests found"
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: benchmark.json

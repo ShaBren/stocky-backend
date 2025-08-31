@@ -2,16 +2,19 @@
 Authentication utilities for JWT tokens and password hashing
 """
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, TYPE_CHECKING
 import secrets
 import string
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..models.models import UserRole
+
+if TYPE_CHECKING:
+    from ..models.models import User, UserRole
 
 
 # Password hashing context
@@ -21,6 +24,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
     return pwd_context.hash(password)
+
+
+# Alias for compatibility
+get_password_hash = hash_password
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -49,7 +56,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     return encoded_jwt
 
 
-def verify_token(token: str) -> Dict[str, Any]:
+def verify_token_payload(token: str) -> Dict[str, Any]:
     """Verify and decode a JWT token"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -62,7 +69,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         )
 
 
-def create_token_response(user_id: int, username: str, role: UserRole) -> Dict[str, Any]:
+def create_token_response(user_id: int, username: str, role: "UserRole") -> Dict[str, Any]:
     """Create a complete token response"""
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=7)
@@ -91,3 +98,80 @@ def create_token_response(user_id: int, username: str, role: UserRole) -> Dict[s
         "role": role,
         "refresh_token": refresh_token,
     }
+
+
+def authenticate_user(db: Session, username: str, password: str) -> Union[bool, "User"]:
+    """Authenticate a user with username and password."""
+    from ..crud import crud
+    
+    user = crud.user.get_by_username(db, username=username)
+    if not user:
+        return False
+    if not user.is_active:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+
+async def get_current_user(db: Session, token: str) -> "User":
+    """Get current user from JWT token."""
+    from ..crud import crud
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = verify_token_payload(token)
+        username: str = payload.get("username")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = crud.user.get_by_username(db, username=username)
+    if user is None:
+        raise credentials_exception
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    return user
+
+
+def verify_token_simple(token: str) -> Optional[Dict[str, Any]]:
+    """Verify JWT token and return payload, or None if invalid."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+# Create an alias for the tests that expect this name
+def verify_token(token: str, db: Session = None) -> Optional["User"]:
+    """Verify token and return user (for test compatibility)."""
+    if db is None:
+        # If no db session provided, just verify token
+        payload = verify_token_simple(token)
+        return payload
+    
+    # With db session, return actual user
+    from ..crud import crud
+    
+    payload = verify_token_simple(token)
+    if not payload:
+        return None
+    
+    username = payload.get("username")
+    if not username:
+        return None
+    
+    user = crud.user.get_by_username(db, username=username)
+    return user

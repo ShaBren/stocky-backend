@@ -148,6 +148,81 @@ For Docker deployment, environment variables are configured in `docker-compose.y
 - `GET /api/v1/health` - Health check endpoint
 - `GET /api/v1/logs/` - Get system logs
 
+## Testing 🧪
+
+Stocky Backend has comprehensive test coverage including unit, integration, API, and end-to-end tests.
+
+### Quick Test Run
+
+```bash
+# Run all tests
+make test
+
+# Run specific test categories
+make test-unit           # Unit tests only
+make test-integration    # Integration tests only
+make test-api           # API tests only
+make test-e2e           # End-to-end tests only
+
+# Run with coverage
+make test-cov
+```
+
+### Test Structure
+
+```
+tests/
+├── unit/                # Unit tests (isolated components)
+├── integration/         # Integration tests (database + business logic)
+├── api/                # API endpoint tests
+├── e2e/                # End-to-end workflow tests
+├── factories/          # Test data factories
+├── fixtures/           # Reusable test fixtures
+└── utils/              # Test utilities and helpers
+```
+
+### Test Features
+
+- **Comprehensive Coverage**: 90%+ code coverage target
+- **Fast Execution**: Optimized for quick feedback during development
+- **Parallel Testing**: Tests run in parallel for faster execution
+- **Database Isolation**: Each test uses clean database state
+- **Factory Pattern**: Consistent test data generation
+- **CI/CD Integration**: Automated testing on push/PR
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install -r tests/requirements-test.txt
+
+# Run specific test files
+pytest tests/unit/test_auth.py -v
+
+# Run tests with markers
+pytest -m "unit" -v              # Unit tests only
+pytest -m "auth" -v              # Authentication tests only
+pytest -m "database" -v          # Database tests only
+
+# Watch mode for development
+pytest --looponfail
+
+# Debug mode
+pytest --pdb
+
+# Performance testing
+pytest -m "slow" --benchmark-only
+```
+
+### Test Configuration
+
+- **pytest.ini**: Main test configuration
+- **conftest.py**: Shared fixtures and test setup
+- **Coverage**: HTML and XML coverage reports
+- **CI/CD**: GitHub Actions workflow with multiple Python versions
+
+For detailed testing information, see [TESTING.md](TESTING.md).
+
 ## Development
 
 ### Database Migrations
@@ -165,7 +240,7 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
-### Running Tests
+### Running Tests (Legacy - see Testing section above)
 
 ```bash
 # Install test dependencies

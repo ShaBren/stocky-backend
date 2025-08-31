@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..db.database import get_db
 from ..models.models import User, UserRole
-from ..core.auth import verify_token
+from ..core.auth import verify_token_payload
 
 
 # Security schemes
@@ -25,7 +25,7 @@ async def get_current_user_from_token(
         return None
     
     # Verify the token
-    payload = verify_token(credentials.credentials)
+    payload = verify_token_payload(credentials.credentials)
     
     # Extract user data
     user_id = payload.get("sub")

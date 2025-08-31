@@ -50,6 +50,9 @@ class User(Base):
     created_locations = relationship("Location", back_populates="created_by_user")
     created_skus = relationship("SKU", back_populates="created_by_user")
     created_alerts = relationship("Alert", back_populates="created_by_user")
+    
+    def __str__(self):
+        return f"<User {self.username}>"
 
 
 class Location(Base):
