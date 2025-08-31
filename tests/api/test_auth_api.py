@@ -224,7 +224,6 @@ class TestTokenRefresh:
     """Test token refresh functionality (if implemented)."""
     
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Token refresh not yet implemented")
     async def test_refresh_valid_token(
         self,
         async_client: AsyncClient,
@@ -247,7 +246,6 @@ class TestTokenRefresh:
         assert "token_type" in data
     
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Token refresh not yet implemented")
     async def test_refresh_expired_token(self, async_client: AsyncClient):
         """Test refreshing an expired token."""
         # Given

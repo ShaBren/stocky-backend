@@ -1,6 +1,7 @@
 """
 Stocky Backend - Main application entry point
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -8,6 +9,15 @@ import uvicorn
 from .core.config import settings
 from .db.database import engine, Base
 from .api.routes import api_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan"""
+    # Startup
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Shutdown (if needed)
 
 
 def create_app() -> FastAPI:
@@ -18,6 +28,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
+        lifespan=lifespan
     )
 
     # Add CORS middleware
@@ -36,13 +47,6 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database tables on startup"""
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
 
 
 if __name__ == "__main__":
