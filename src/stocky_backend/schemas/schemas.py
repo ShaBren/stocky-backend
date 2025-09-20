@@ -238,3 +238,27 @@ class SearchResponse(BaseModel):
     items: List[ItemResponse]
     total_count: int
     query: str
+
+
+# Backup schemas
+class BackupResponse(BaseModel):
+    """Response for backup creation"""
+    backup_size: int
+    timestamp: datetime
+    tables_included: List[str]
+    message: str
+
+
+class BackupImportRequest(BaseModel):
+    """Request for backup import"""
+    backup_data: str = Field(..., description="Base64 encoded gzipped SQL data")
+    force: bool = Field(default=False, description="Force import even if it might cause data loss")
+
+
+class BackupImportResponse(BaseModel):
+    """Response for backup import"""
+    success: bool
+    message: str
+    tables_affected: List[str]
+    records_imported: int
+    timestamp: datetime
