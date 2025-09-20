@@ -254,7 +254,11 @@ async def import_full_backup(
                 temp_file.write(sql_data)
                 temp_file.flush()
                 
-                # Replace database with restored data
+                # Remove the existing database file completely
+                if Path(db_path).exists():
+                    Path(db_path).unlink()
+                
+                # Create a new database from the SQL dump
                 subprocess.run([
                     'sqlite3', db_path, f'.read {temp_file.name}'
                 ], check=True, input='', text=True)
