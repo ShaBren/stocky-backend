@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+pysqlite:///./data/stocky.db"
     
     # CORS settings
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     
     # UDA (Universal Data Application) settings
     UDA_BASE_URL: Optional[str] = None
@@ -34,19 +34,22 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     MAX_LOG_ENTRIES: int = 10000
     
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v):
-        if isinstance(v, str):
-            return [i.strip() for i in v.split(",")]
-        return v
-    
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v):
         if v == "your-secret-key-change-this-in-production":
             print("WARNING: Using default secret key. Change this in production!")
         return v
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """Convert ALLOWED_ORIGINS string to list for CORS middleware"""
+        if isinstance(self.ALLOWED_ORIGINS, str):
+            if "," in self.ALLOWED_ORIGINS:
+                return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+            else:
+                return [self.ALLOWED_ORIGINS.strip()]
+        return self.ALLOWED_ORIGINS
 
     model_config = {"env_file": ".env", "case_sensitive": True}
 
