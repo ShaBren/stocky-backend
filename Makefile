@@ -2,7 +2,7 @@
 # 
 # This Makefile provides convenient commands for running tests and development tasks.
 
-.PHONY: help test test-unit test-integration test-api test-e2e test-all test-cov test-watch clean lint format setup install-test-deps
+.PHONY: help test test-unit test-integration test-api test-e2e test-all test-cov test-watch clean lint format setup install-test-deps docker-image
 
 # Default target
 help:
@@ -34,6 +34,7 @@ help:
 	@echo "  requirements        Generate requirements.txt files"
 	@echo ""
 	@echo "Docker Commands:"
+	@echo "  docker-image        Build production Docker image"
 	@echo "  docker-test         Run tests in Docker container"
 	@echo "  docker-build-test   Build test Docker image"
 
@@ -167,6 +168,9 @@ requirements-upgrade:
 	pip-compile --upgrade tests/requirements-test.in
 
 # Docker testing commands
+docker-image:
+	docker buildx build --platform linux/amd64,linux/arm64 -t docker-registry.eruditio.net/stocky-backend:latest --push .
+
 docker-build-test:
 	docker build -t stocky-backend:test .
 
