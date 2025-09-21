@@ -8,3 +8,6 @@ __pycache__/
 .DS_Store
 *.ipynb
 
+*.pyc
+.coverage
+coverage.xml
