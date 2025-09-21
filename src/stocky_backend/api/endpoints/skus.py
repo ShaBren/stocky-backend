@@ -178,7 +178,7 @@ async def delete_sku(
     log_crud.create(db, obj_in=log_entry)
     return {"message": "SKU deleted successfully"}
 
-@router.get("/low-stock/", response_model=List[SKUResponse])
+@router.get("/low-stock", response_model=List[SKUResponse])
 async def get_low_stock_items(
     skip: int = Query(0, ge=0, description="Number of SKUs to skip"),
     limit: int = Query(100, ge=1, le=500, description="Number of SKUs to return"),
