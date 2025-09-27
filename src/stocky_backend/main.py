@@ -9,6 +9,7 @@ import uvicorn
 from .core.config import settings
 from .db.database import engine, Base
 from .api.routes import api_router
+from . import __version__
 
 
 @asynccontextmanager
@@ -25,7 +26,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Stocky Backend",
         description="A home kitchen inventory management system API",
-        version="0.1.0",
+        version=__version__,
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
         lifespan=lifespan

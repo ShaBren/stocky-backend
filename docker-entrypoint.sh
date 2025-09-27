@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-echo "Starting Stocky Backend v0.0.1..."
+# Extract version from pyproject.toml
+VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+echo "Starting Stocky Backend v${VERSION}..."
 
 # Ensure data directory exists
 mkdir -p /app/data

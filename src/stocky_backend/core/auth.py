@@ -7,7 +7,6 @@ import secrets
 import string
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -18,32 +17,41 @@ if TYPE_CHECKING:
 
 
 # Password hashing context
-# Use a fallback approach for bcrypt compatibility issues with Python 3.13
-try:
-    # Try standard bcrypt initialization
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-except Exception:
-    # Fallback to direct bcrypt usage with manual handling
-    import bcrypt as _bcrypt
+# Use direct bcrypt to avoid passlib compatibility issues with Python 3.13
+import bcrypt as _bcrypt
+
+class BcryptContext:
+    """Direct bcrypt wrapper to avoid passlib compatibility issues"""
     
-    class DirectBcryptContext:
-        @staticmethod
-        def hash(password: str) -> str:
-            # Manual bcrypt hashing
-            password_bytes = password.encode('utf-8')[:72]  # Truncate to 72 bytes
-            salt = _bcrypt.gensalt(rounds=12)
-            return _bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+    @staticmethod
+    def hash(password: str) -> str:
+        """Hash a password using bcrypt"""
+        # Encode password and ensure it's not longer than 72 bytes
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
         
-        @staticmethod
-        def verify(password: str, hashed: str) -> bool:
-            # Manual bcrypt verification
-            try:
-                password_bytes = password.encode('utf-8')[:72]  # Truncate to 72 bytes
-                return _bcrypt.checkpw(password_bytes, hashed.encode('utf-8'))
-            except Exception:
-                return False
+        # Generate salt and hash
+        salt = _bcrypt.gensalt(rounds=12)
+        hashed_bytes = _bcrypt.hashpw(password_bytes, salt)
+        return hashed_bytes.decode('utf-8')
     
-    pwd_context = DirectBcryptContext()
+    @staticmethod
+    def verify(password: str, hashed: str) -> bool:
+        """Verify a password against its hash"""
+        try:
+            # Encode password and ensure it's not longer than 72 bytes
+            password_bytes = password.encode('utf-8')
+            if len(password_bytes) > 72:
+                password_bytes = password_bytes[:72]
+            
+            # Verify password
+            hashed_bytes = hashed.encode('utf-8')
+            return _bcrypt.checkpw(password_bytes, hashed_bytes)
+        except Exception:
+            return False
+
+pwd_context = BcryptContext()
 
 
 def hash_password(password: str) -> str:

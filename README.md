@@ -367,16 +367,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Changelog
 
-### v0.0.1 (2025-08-30)
-
-- Initial release
-- Basic inventory management API
-- Docker containerization
-- JWT authentication
-- SQLAlchemy models for items, locations, SKUs
-- Barcode scanning support
-- Alert system
-- API documentation with FastAPI
+See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
 ## Contact
 

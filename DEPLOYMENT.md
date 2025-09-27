@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers deploying the Stocky Backend v0.0.1 using Docker. The application is containerized and ready for production deployment.
+This guide covers deploying the Stocky Backend using Docker. The application is containerized and ready for production deployment.
 
 ## Prerequisites
 
@@ -82,7 +82,7 @@ For production deployment, ensure you:
 
 Build the image manually:
 ```bash
-docker build -t stocky-backend:v0.0.1 .
+docker build -t stocky-backend:latest .
 ```
 
 ### Volume Management
@@ -150,7 +150,7 @@ spec:
     spec:
       containers:
       - name: stocky-backend
-        image: stocky-backend:v0.0.1
+        image: stocky-backend:latest
         ports:
         - containerPort: 8000
         env:
@@ -353,7 +353,7 @@ For issues and support:
 
 ## Version Information
 
-- **Application Version**: v0.0.1
+- **Application Version**: See [CHANGELOG.md](./CHANGELOG.md) for current version
 - **Docker Image**: Built with Python 3.13-slim
 - **Database**: SQLite (production: PostgreSQL recommended)
 - **Web Server**: Uvicorn ASGI server
