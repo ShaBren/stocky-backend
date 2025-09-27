@@ -5,13 +5,22 @@ All notable changes to Stocky Backend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-09-27
+
+### Fixed
+- **Authentication**: Resolved bcrypt authentication compatibility with Python 3.13 in Docker
+  - Replaced passlib CryptContext with direct bcrypt implementation
+  - Fixed ValueError during passlib backend detection in containerized environments
+  - Ensures consistent authentication behavior across local and Docker environments
+  - Maintains proper 72-byte password truncation for bcrypt compatibility
+
 ## [0.2.1] - 2025-09-27
 
 ### Fixed
-- **Authentication**: Fixed bcrypt compatibility issues with Python 3.13
-  - Added proper handling for bcrypt's 72-byte password limit
-  - Improved error handling in password hashing and verification
-  - Enhanced UTF-8 encoding handling for international characters
+- **Version Management**: Implemented dynamic version reporting across all components
+  - Version now dynamically read from pyproject.toml in all contexts
+  - Fixed hardcoded version references in Docker startup and API responses
+  - Updated documentation to use current version references
 
 ## [0.2.0] - 2025-09-27 - The Shopping List Update
 
