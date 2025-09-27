@@ -18,31 +18,37 @@ if TYPE_CHECKING:
 
 
 # Password hashing context
-# Initialize with conservative settings for Python 3.13 compatibility  
-pwd_context = CryptContext(
-    schemes=["bcrypt"], 
-    deprecated="auto",
-    bcrypt__rounds=12,
-    bcrypt__truncate_error=False
-)
+# Use a fallback approach for bcrypt compatibility issues with Python 3.13
+try:
+    # Try standard bcrypt initialization
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+except Exception:
+    # Fallback to direct bcrypt usage with manual handling
+    import bcrypt as _bcrypt
+    
+    class DirectBcryptContext:
+        @staticmethod
+        def hash(password: str) -> str:
+            # Manual bcrypt hashing
+            password_bytes = password.encode('utf-8')[:72]  # Truncate to 72 bytes
+            salt = _bcrypt.gensalt(rounds=12)
+            return _bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+        
+        @staticmethod
+        def verify(password: str, hashed: str) -> bool:
+            # Manual bcrypt verification
+            try:
+                password_bytes = password.encode('utf-8')[:72]  # Truncate to 72 bytes
+                return _bcrypt.checkpw(password_bytes, hashed.encode('utf-8'))
+            except Exception:
+                return False
+    
+    pwd_context = DirectBcryptContext()
 
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
-    try:
-        # Bcrypt has a 72-byte limit, truncate if necessary
-        password_bytes = password.encode('utf-8')
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
-            password = password_bytes.decode('utf-8', errors='ignore')
-        return pwd_context.hash(password)
-    except ValueError as e:
-        if "password cannot be longer than 72 bytes" in str(e):
-            # Force truncation and try again
-            password_bytes = password.encode('utf-8')[:72]
-            password = password_bytes.decode('utf-8', errors='ignore')
-            return pwd_context.hash(password)
-        raise
+    return pwd_context.hash(password)
 
 
 # Alias for compatibility
@@ -51,20 +57,7 @@ get_password_hash = hash_password
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
-    try:
-        # Bcrypt has a 72-byte limit, truncate if necessary
-        password_bytes = plain_password.encode('utf-8')
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
-            plain_password = password_bytes.decode('utf-8', errors='ignore')
-        return pwd_context.verify(plain_password, hashed_password)
-    except ValueError as e:
-        if "password cannot be longer than 72 bytes" in str(e):
-            # Force truncation and try again
-            password_bytes = plain_password.encode('utf-8')[:72]
-            plain_password = password_bytes.decode('utf-8', errors='ignore')
-            return pwd_context.verify(plain_password, hashed_password)
-        raise
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def generate_api_key(length: int = 32) -> str:
