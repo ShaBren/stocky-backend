@@ -1,7 +1,7 @@
 """
 Database models for the Stocky Backend application
 """
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, Text, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum
@@ -50,6 +50,7 @@ class User(Base):
     created_locations = relationship("Location", back_populates="created_by_user")
     created_skus = relationship("SKU", back_populates="created_by_user")
     created_alerts = relationship("Alert", back_populates="created_by_user")
+    shopping_lists = relationship("ShoppingList", back_populates="creator")
     
     def __str__(self):
         return f"<User {self.username}>"
@@ -176,4 +177,64 @@ class LogEntry(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
+    user = relationship("User")
+
+
+class ShoppingList(Base):
+    """Shopping list model for managing shopping lists with items"""
+    __tablename__ = "shopping_lists"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    is_public = Column(Boolean, nullable=False, default=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    creator = relationship("User", back_populates="shopping_lists")
+    items = relationship("ShoppingListItem", back_populates="shopping_list", cascade="all, delete-orphan")
+    logs = relationship("ShoppingListLog", back_populates="shopping_list", cascade="all, delete-orphan")
+
+
+class ShoppingListItem(Base):
+    """Shopping list item model linking items to shopping lists with quantities"""
+    __tablename__ = "shopping_list_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    shopping_list_id = Column(Integer, ForeignKey("shopping_lists.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    shopping_list = relationship("ShoppingList", back_populates="items")
+    item = relationship("Item")
+    
+    # Constraints
+    __table_args__ = (UniqueConstraint('shopping_list_id', 'item_id', name='unique_list_item'),)
+
+
+class ShoppingListLog(Base):
+    """Shopping list log model for tracking all changes to shopping lists"""
+    __tablename__ = "shopping_list_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    shopping_list_id = Column(Integer, ForeignKey("shopping_lists.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action_type = Column(String(50), nullable=False)  # 'created', 'updated', 'deleted', 'item_added', 'item_updated', 'item_removed', 'duplicated'
+    details = Column(Text)  # JSON string with change details
+    
+    # Timestamp
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    shopping_list = relationship("ShoppingList", back_populates="logs")
     user = relationship("User")

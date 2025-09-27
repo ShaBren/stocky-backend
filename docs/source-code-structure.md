@@ -2,8 +2,8 @@
 
 This document provides a comprehensive overview of every source file in the Stocky Backend application, organized by directory and functionality.
 
-**Last Updated:** September 21, 2025  
-**Total Files:** 18
+**Last Updated:** September 27, 2025  
+**Total Files:** 19
 
 ---
 
@@ -58,6 +58,7 @@ This document provides a comprehensive overview of every source file in the Stoc
 - `/scanner` - Barcode scanner operations
 - `/logs` - System logging endpoints
 - `/alerts` - Alert management endpoints
+- `/shopping-lists` - Shopping list management endpoints
 - `/backup` - Database backup/restore endpoints
 
 ---
@@ -208,6 +209,30 @@ This document provides a comprehensive overview of every source file in the Stoc
 **Endpoints:**
 - `GET /` - List alerts with filtering
 - `POST /` - Create new alert
+
+---
+
+### `src/stocky_backend/api/endpoints/shopping_lists.py`
+**Purpose:** Shopping list management and collaborative editing  
+**Key Responsibilities:**
+- Shopping list CRUD operations (create, read, update, delete)
+- Public/private visibility management and access control
+- Shopping list item management (add, update, remove items)
+- Complete audit logging of all list and item changes
+- List duplication functionality
+- Collaborative editing (public lists editable by any user)
+
+**Endpoints:**
+- `GET /` - List accessible shopping lists (paginated)
+- `GET /{list_id}` - Get shopping list details with items
+- `POST /` - Create new shopping list
+- `PUT /{list_id}` - Update shopping list metadata
+- `DELETE /{list_id}` - Delete shopping list (soft delete)
+- `POST /{list_id}/duplicate` - Duplicate shopping list with items
+- `POST /{list_id}/items` - Add item to shopping list
+- `PUT /{list_id}/items/{item_id}` - Update item quantity
+- `DELETE /{list_id}/items/{item_id}` - Remove item from list
+- `GET /{list_id}/logs` - Get shopping list change logs
 
 ---
 

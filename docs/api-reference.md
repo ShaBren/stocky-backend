@@ -14,7 +14,8 @@
 6. [SKU/Inventory Management](#sku-inventory-management)
 7. [Scanner Operations](#scanner-operations)
 8. [Logging](#logging)
-9. [Alerts](#alerts)
+8. [Alerts](#alerts)
+9. [Shopping Lists](#shopping-lists)
 10. [Backup & Restore](#backup--restore)
 11. [Health Check](#health-check)
 12. [Error Codes](#error-codes)
@@ -851,6 +852,386 @@ All scanner endpoints are under `/scanner/`
   "sku_id": 1
 }
 ```
+
+---
+
+## Shopping Lists
+
+All shopping list endpoints are under `/shopping-lists/`
+
+### GET /shopping-lists/
+**Description:** List shopping lists accessible to current user (public + own private)  
+**Authentication:** Bearer Token or API Key required
+
+**Query Parameters:**
+- `skip` (int, default: 0): Number of lists to skip
+- `limit` (int, default: 100): Number of lists to return (max: 1000)
+- `include_deleted` (bool, default: false): Include deleted lists (admin only)
+
+**Response:** `200 OK`
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Weekly Groceries",
+      "is_public": true,
+      "creator": {
+        "id": 1,
+        "username": "john_doe",
+        "email": "john@example.com",
+        "role": "MEMBER",
+        "is_active": true,
+        "created_at": "2025-09-01T10:00:00Z",
+        "updated_at": "2025-09-01T10:00:00Z"
+      },
+      "item_count": 5,
+      "created_at": "2025-09-27T10:00:00Z",
+      "updated_at": "2025-09-27T11:30:00Z"
+    }
+  ],
+  "total": 1,
+  "skip": 0,
+  "limit": 100
+}
+```
+
+---
+
+### GET /shopping-lists/{list_id}
+**Description:** Get shopping list details with all items  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists or user's own private lists
+
+**Response:** `200 OK`
+```json
+{
+  "id": 1,
+  "name": "Weekly Groceries",
+  "is_public": true,
+  "creator": {
+    "id": 1,
+    "username": "john_doe",
+    "email": "john@example.com",
+    "role": "MEMBER",
+    "is_active": true,
+    "created_at": "2025-09-01T10:00:00Z",
+    "updated_at": "2025-09-01T10:00:00Z"
+  },
+  "items": [
+    {
+      "id": 1,
+      "item": {
+        "id": 10,
+        "name": "Whole Milk",
+        "description": "1 gallon whole milk",
+        "upc": "123456789012",
+        "default_storage_type": "refrigerator",
+        "is_active": true,
+        "uda_fetched": false,
+        "uda_fetch_attempted": false,
+        "created_at": "2025-09-01T10:00:00Z",
+        "updated_at": "2025-09-01T10:00:00Z"
+      },
+      "quantity": 2,
+      "created_at": "2025-09-27T10:15:00Z",
+      "updated_at": "2025-09-27T10:15:00Z"
+    }
+  ],
+  "created_at": "2025-09-27T10:00:00Z",
+  "updated_at": "2025-09-27T11:30:00Z"
+}
+```
+
+**Error Responses:**
+- `404 Not Found`: Shopping list not found or access denied
+
+---
+
+### POST /shopping-lists/
+**Description:** Create a new shopping list  
+**Authentication:** Bearer Token or API Key required
+
+**Request Body:**
+```json
+{
+  "name": "Weekly Groceries",
+  "is_public": false
+}
+```
+
+**Validation:**
+- `name`: 1-255 characters, required
+- `is_public`: boolean, default false
+
+**Response:** `201 Created`
+```json
+{
+  "id": 1,
+  "name": "Weekly Groceries",
+  "is_public": false,
+  "creator": {
+    "id": 1,
+    "username": "john_doe",
+    "email": "john@example.com",
+    "role": "MEMBER",
+    "is_active": true,
+    "created_at": "2025-09-01T10:00:00Z",
+    "updated_at": "2025-09-01T10:00:00Z"
+  },
+  "items": [],
+  "created_at": "2025-09-27T10:00:00Z",
+  "updated_at": "2025-09-27T10:00:00Z"
+}
+```
+
+---
+
+### PUT /shopping-lists/{list_id}
+**Description:** Update shopping list metadata (name, visibility)  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists (any authenticated user) or private lists (creator only)
+
+**Request Body:**
+```json
+{
+  "name": "Updated List Name",
+  "is_public": true
+}
+```
+
+**Validation:**
+- `name`: 1-255 characters, optional
+- `is_public`: boolean, optional
+
+**Response:** `200 OK` (same structure as create response)
+
+**Error Responses:**
+- `403 Forbidden`: User lacks permission to modify list
+- `404 Not Found`: Shopping list not found or access denied
+
+---
+
+### DELETE /shopping-lists/{list_id}
+**Description:** Delete a shopping list (soft delete)  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists (any authenticated user) or private lists (creator only)
+
+**Response:** `204 No Content`
+
+**Error Responses:**
+- `403 Forbidden`: User lacks permission to delete list
+- `404 Not Found`: Shopping list not found or access denied
+
+---
+
+### POST /shopping-lists/{list_id}/duplicate
+**Description:** Duplicate a shopping list with all its items  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Must be able to view the source list
+
+**Request Body:**
+```json
+{
+  "name": "Copy of Weekly Groceries",
+  "is_public": false
+}
+```
+
+**Validation:**
+- `name`: 1-255 characters, required
+- `is_public`: boolean, default false
+
+**Response:** `201 Created`
+```json
+{
+  "id": 2,
+  "name": "Copy of Weekly Groceries",
+  "is_public": false,
+  "creator": {
+    "id": 1,
+    "username": "john_doe",
+    "email": "john@example.com",
+    "role": "MEMBER",
+    "is_active": true,
+    "created_at": "2025-09-01T10:00:00Z",
+    "updated_at": "2025-09-01T10:00:00Z"
+  },
+  "items": [
+    {
+      "id": 3,
+      "item": {
+        "id": 10,
+        "name": "Whole Milk",
+        "description": "1 gallon whole milk",
+        "upc": "123456789012",
+        "default_storage_type": "refrigerator",
+        "is_active": true,
+        "uda_fetched": false,
+        "uda_fetch_attempted": false,
+        "created_at": "2025-09-01T10:00:00Z",
+        "updated_at": "2025-09-01T10:00:00Z"
+      },
+      "quantity": 2,
+      "created_at": "2025-09-27T12:00:00Z",
+      "updated_at": "2025-09-27T12:00:00Z"
+    }
+  ],
+  "created_at": "2025-09-27T12:00:00Z",
+  "updated_at": "2025-09-27T12:00:00Z"
+}
+```
+
+---
+
+### POST /shopping-lists/{list_id}/items
+**Description:** Add an item to a shopping list  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists (any authenticated user) or private lists (creator only)
+
+**Request Body:**
+```json
+{
+  "item_id": 10,
+  "quantity": 2
+}
+```
+
+**Validation:**
+- `item_id`: integer, required (must reference existing item)
+- `quantity`: integer > 0, required
+
+**Response:** `201 Created`
+```json
+{
+  "id": 1,
+  "item": {
+    "id": 10,
+    "name": "Whole Milk",
+    "description": "1 gallon whole milk",
+    "upc": "123456789012",
+    "default_storage_type": "refrigerator",
+    "is_active": true,
+    "uda_fetched": false,
+    "uda_fetch_attempted": false,
+    "created_at": "2025-09-01T10:00:00Z",
+    "updated_at": "2025-09-01T10:00:00Z"
+  },
+  "quantity": 2,
+  "created_at": "2025-09-27T10:15:00Z",
+  "updated_at": "2025-09-27T10:15:00Z"
+}
+```
+
+**Error Responses:**
+- `403 Forbidden`: User lacks permission to modify list
+- `404 Not Found`: Shopping list or item not found
+- `409 Conflict`: Item already exists in shopping list
+
+---
+
+### PUT /shopping-lists/{list_id}/items/{item_id}
+**Description:** Update the quantity of an item in a shopping list  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists (any authenticated user) or private lists (creator only)
+
+**Request Body:**
+```json
+{
+  "quantity": 3
+}
+```
+
+**Validation:**
+- `quantity`: integer > 0, required
+
+**Response:** `200 OK` (same structure as add item response)
+
+**Error Responses:**
+- `403 Forbidden`: User lacks permission to modify list
+- `404 Not Found`: Shopping list or item not found in list
+
+---
+
+### DELETE /shopping-lists/{list_id}/items/{item_id}
+**Description:** Remove an item from a shopping list (soft delete)  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Public lists (any authenticated user) or private lists (creator only)
+
+**Response:** `204 No Content`
+
+**Error Responses:**
+- `403 Forbidden`: User lacks permission to modify list
+- `404 Not Found`: Shopping list or item not found in list
+
+---
+
+### GET /shopping-lists/{list_id}/logs
+**Description:** Get logs for a shopping list (change history)  
+**Authentication:** Bearer Token or API Key required  
+**Access:** Available to any user who can view the shopping list
+
+**Query Parameters:**
+- `skip` (int, default: 0): Number of logs to skip
+- `limit` (int, default: 100): Number of logs to return (max: 1000)
+- `action_type` (string, optional): Filter by action type
+
+**Response:** `200 OK`
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "action_type": "item_added",
+      "user": {
+        "id": 1,
+        "username": "john_doe",
+        "email": "john@example.com",
+        "role": "MEMBER",
+        "is_active": true,
+        "created_at": "2025-09-01T10:00:00Z",
+        "updated_at": "2025-09-01T10:00:00Z"
+      },
+      "details": {
+        "item_id": 10,
+        "item_name": "Whole Milk",
+        "quantity": 2
+      },
+      "timestamp": "2025-09-27T10:15:00Z"
+    },
+    {
+      "id": 2,
+      "action_type": "created",
+      "user": {
+        "id": 1,
+        "username": "john_doe",
+        "email": "john@example.com",
+        "role": "MEMBER",
+        "is_active": true,
+        "created_at": "2025-09-01T10:00:00Z",
+        "updated_at": "2025-09-01T10:00:00Z"
+      },
+      "details": {
+        "list_name": "Weekly Groceries",
+        "is_public": false
+      },
+      "timestamp": "2025-09-27T10:00:00Z"
+    }
+  ],
+  "total": 2,
+  "skip": 0,
+  "limit": 100
+}
+```
+
+**Action Types:**
+- `created`: Shopping list was created
+- `updated`: Shopping list metadata was changed
+- `deleted`: Shopping list was deleted
+- `item_added`: Item was added to the list
+- `item_updated`: Item quantity was changed
+- `item_removed`: Item was removed from the list
+- `duplicated`: Shopping list was duplicated from another list
 
 ---
 

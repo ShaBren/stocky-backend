@@ -2,7 +2,7 @@
 Pydantic schemas for API request/response models
 """
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from ..models.models import UserRole, StorageType
@@ -262,3 +262,99 @@ class BackupImportResponse(BaseModel):
     tables_affected: List[str]
     records_imported: int
     timestamp: datetime
+
+
+# Shopping List schemas
+class ShoppingListItemBase(BaseModel):
+    """Base shopping list item schema"""
+    item_id: int
+    quantity: int = Field(gt=0, description="Quantity must be greater than 0")
+
+
+class ShoppingListItemCreate(ShoppingListItemBase):
+    """Shopping list item creation request"""
+    pass
+
+
+class ShoppingListItemUpdate(BaseModel):
+    """Shopping list item update request"""
+    quantity: int = Field(gt=0, description="Quantity must be greater than 0")
+
+
+class ShoppingListItemResponse(BaseSchema):
+    """Shopping list item response model"""
+    id: int
+    item: ItemResponse
+    quantity: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ShoppingListBase(BaseModel):
+    """Base shopping list schema"""
+    name: str = Field(min_length=1, max_length=255, description="List name")
+    is_public: bool = Field(default=False, description="Whether list is public")
+
+
+class ShoppingListCreate(ShoppingListBase):
+    """Shopping list creation request"""
+    pass
+
+
+class ShoppingListUpdate(BaseModel):
+    """Shopping list update request"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    is_public: Optional[bool] = None
+
+
+class ShoppingListDuplicate(BaseModel):
+    """Shopping list duplication request"""
+    name: str = Field(min_length=1, max_length=255, description="Name for duplicated list")
+    is_public: bool = Field(default=False, description="Whether duplicated list should be public")
+
+
+class ShoppingListSummary(BaseSchema):
+    """Shopping list summary response model (for list views)"""
+    id: int
+    name: str
+    is_public: bool
+    creator: UserResponse
+    item_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ShoppingListResponse(BaseSchema):
+    """Shopping list detailed response model"""
+    id: int
+    name: str
+    is_public: bool
+    creator: UserResponse
+    items: List[ShoppingListItemResponse]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ShoppingListLogResponse(BaseSchema):
+    """Shopping list log response model"""
+    id: int
+    action_type: str
+    user: UserResponse
+    details: Optional[Dict[str, Any]] = None
+    timestamp: datetime
+
+
+class PaginatedShoppingListsResponse(BaseModel):
+    """Paginated shopping lists response"""
+    items: List[ShoppingListSummary]
+    total: int
+    skip: int
+    limit: int
+
+
+class PaginatedShoppingListLogsResponse(BaseModel):
+    """Paginated shopping list logs response"""
+    items: List[ShoppingListLogResponse]
+    total: int
+    skip: int
+    limit: int
