@@ -36,6 +36,7 @@ class LoginRequest(BaseModel):
     """User login request"""
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
+    remember_me: bool = Field(default=False, description="Enable persistent session with cookies")
 
 
 class UserCreate(BaseModel):

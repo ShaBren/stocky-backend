@@ -7,7 +7,7 @@ import secrets
 import string
 
 from jose import JWTError, jwt
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -234,3 +234,75 @@ def verify_token(token: str, db: Session = None) -> Optional["User"]:
         return user
     
     return None
+
+
+# Cookie utilities for persistent sessions
+def set_refresh_token_cookie(response: Response, refresh_token: str, persistent: bool = False) -> None:
+    """Set refresh token in HTTP-only cookie"""
+    max_age = None
+    if persistent:
+        max_age = settings.PERSISTENT_SESSION_EXPIRE_DAYS * 24 * 60 * 60  # Convert days to seconds
+    else:
+        max_age = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    
+    response.set_cookie(
+        key=settings.COOKIE_NAME,
+        value=refresh_token,
+        max_age=max_age,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        domain=settings.COOKIE_DOMAIN,
+    )
+
+
+def get_refresh_token_from_cookie(request: Request) -> Optional[str]:
+    """Get refresh token from HTTP-only cookie"""
+    return request.cookies.get(settings.COOKIE_NAME)
+
+
+def clear_refresh_token_cookie(response: Response) -> None:
+    """Clear refresh token cookie (for logout)"""
+    response.delete_cookie(
+        key=settings.COOKIE_NAME,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        domain=settings.COOKIE_DOMAIN,
+    )
+
+
+def create_persistent_token_response(user_id: int, username: str, role: "UserRole", remember_me: bool = False) -> Dict[str, Any]:
+    """Create a token response with optional persistent session support"""
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Use different refresh token expiration based on remember_me
+    if remember_me:
+        refresh_token_expires = timedelta(days=settings.PERSISTENT_SESSION_EXPIRE_DAYS)
+    else:
+        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    token_data = {
+        "sub": str(user_id),
+        "username": username,
+        "role": role,
+    }
+
+    access_token = create_access_token(
+        data=token_data,
+        expires_delta=access_token_expires
+    )
+
+    refresh_token = create_access_token(
+        data={"sub": str(user_id), "type": "refresh"},
+        expires_delta=refresh_token_expires
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
+        "user_id": user_id,
+        "role": role,
+        "refresh_token": refresh_token,
+    }

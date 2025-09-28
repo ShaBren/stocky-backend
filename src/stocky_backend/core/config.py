@@ -18,7 +18,16 @@ class Settings(BaseSettings):
     # Security settings
     SECRET_KEY: str = "your-secret-key-change-this-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    PERSISTENT_SESSION_EXPIRE_DAYS: int = 30
     ALGORITHM: str = "HS256"
+    
+    # Cookie settings for persistent sessions
+    COOKIE_NAME: str = "stocky_refresh_token"
+    COOKIE_SECURE: bool = False  # Set to True in production with HTTPS
+    COOKIE_HTTPONLY: bool = True
+    COOKIE_SAMESITE: str = "lax"  # "lax", "strict", or "none"
+    COOKIE_DOMAIN: Optional[str] = None  # Set for subdomain sharing
     
     # Database settings - will be overridden by .env file
     DATABASE_URL: str = "sqlite+pysqlite:///./data/stocky.db"

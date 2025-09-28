@@ -2,12 +2,16 @@
 """
 Authentication endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from ...db.database import get_db
 from ...models.models import User
-from ...core.auth import verify_password, create_token_response, generate_api_key
+from ...core.auth import (
+    verify_password, create_token_response, generate_api_key,
+    create_persistent_token_response, set_refresh_token_cookie, clear_refresh_token_cookie,
+    get_refresh_token_from_cookie, verify_token_payload
+)
 from ...core.security import get_current_active_user
 from ...schemas.schemas import Token, LoginRequest, UserResponse
 
@@ -15,24 +19,47 @@ router = APIRouter()
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Refresh access token using a valid refresh token"""
-    # The refresh token comes from the Authorization header via get_current_active_user
-    # This ensures the refresh token is valid and the user is active
+    """Refresh access token using a valid refresh token from header or cookie"""
+    # Check if there's a refresh token in cookies (for persistent sessions)
+    cookie_refresh_token = get_refresh_token_from_cookie(request)
+    is_persistent_session = cookie_refresh_token is not None
     
     # Generate new tokens for the authenticated user
-    token_response = create_token_response(current_user.id, current_user.username, current_user.role)
+    token_response = create_persistent_token_response(
+        current_user.id, current_user.username, current_user.role, 
+        remember_me=is_persistent_session
+    )
+    
+    # If this was a cookie-based session, update the cookie with the new refresh token
+    if is_persistent_session:
+        set_refresh_token_cookie(
+            response, 
+            token_response["refresh_token"], 
+            persistent=True
+        )
+    
     return Token(**token_response)
 
 
 @router.post("/login", response_model=Token)
 async def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    remember_me: bool = False,
     db: Session = Depends(get_db)
 ):
-    """User login with username/password to get JWT token"""
+    """User login with username/password to get JWT token
+    
+    Form fields:
+    - username: User's username
+    - password: User's password  
+    - remember_me: Optional boolean for persistent session (default: false)
+    """
     
     # Get user from database
     user = db.query(User).filter(User.username == form_data.username).first()
@@ -52,14 +79,26 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Create and return token
-    token_response = create_token_response(user.id, user.username, user.role)
+    # Create token response with persistent session support
+    token_response = create_persistent_token_response(
+        user.id, user.username, user.role, remember_me=remember_me
+    )
+    
+    # Set refresh token in cookie if remember_me is enabled
+    if remember_me:
+        set_refresh_token_cookie(
+            response, 
+            token_response["refresh_token"], 
+            persistent=True
+        )
+    
     return Token(**token_response)
 
 
 @router.post("/login-json", response_model=Token)
 async def login_json(
     login_data: LoginRequest,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """User login with JSON payload to get JWT token"""
@@ -80,14 +119,31 @@ async def login_json(
             detail="Incorrect username or password",
         )
     
-    # Create and return token
-    token_response = create_token_response(user.id, user.username, user.role)
+    # Create token response with persistent session support
+    token_response = create_persistent_token_response(
+        user.id, user.username, user.role, remember_me=login_data.remember_me
+    )
+    
+    # Set refresh token in cookie if remember_me is enabled
+    if login_data.remember_me:
+        set_refresh_token_cookie(
+            response, 
+            token_response["refresh_token"], 
+            persistent=True
+        )
+    
     return Token(**token_response)
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_active_user)):
-    """User logout endpoint (client should discard token)"""
+async def logout(
+    response: Response,
+    current_user: User = Depends(get_current_active_user)
+):
+    """User logout endpoint (clears cookies and client should discard tokens)"""
+    # Clear refresh token cookie if it exists
+    clear_refresh_token_cookie(response)
+    
     return {"message": f"User {current_user.username} logged out successfully"}
 
 
