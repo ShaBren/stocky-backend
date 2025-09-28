@@ -45,7 +45,7 @@ X-API-Key: <api_key>
 
 ## Authentication Endpoints
 
-All authentication endpoints are under `/auth/`
+All authentication endpoints are under `/auth`
 
 ### POST /auth/login
 **Description:** Login with username/password (form data)  
@@ -175,7 +175,7 @@ username=your_username&password=your_password
 
 ## User Management
 
-All user management endpoints are under `/users/` and require **ADMIN** role.
+All user management endpoints are under `/users` and require **ADMIN** role.
 
 ### GET /users/
 **Description:** List all users  
@@ -312,7 +312,7 @@ All user management endpoints are under `/users/` and require **ADMIN** role.
 
 ## Item Management
 
-All item endpoints are under `/items/`
+All item endpoints are under `/items`
 
 ### GET /items/
 **Description:** List all items  
@@ -453,7 +453,7 @@ All item endpoints are under `/items/`
 
 ## Location Management
 
-All location endpoints are under `/locations/`
+All location endpoints are under `/locations`
 
 ### GET /locations/
 **Description:** List all locations  
@@ -541,7 +541,7 @@ All location endpoints are under `/locations/`
 
 ## SKU/Inventory Management
 
-All SKU endpoints are under `/skus/`
+All SKU endpoints are under `/skus`
 
 ### GET /skus/
 **Description:** List all SKUs (inventory items)  
@@ -675,7 +675,7 @@ All SKU endpoints are under `/skus/`
 
 ## Scanner Operations
 
-All scanner endpoints are under `/scanner/`
+All scanner endpoints are under `/scanner`
 
 ### POST /scanner/scan
 **Description:** Process barcode scan  
@@ -857,7 +857,7 @@ All scanner endpoints are under `/scanner/`
 
 ## Shopping Lists
 
-All shopping list endpoints are under `/shopping-lists/`
+All shopping list endpoints are under `/shopping-lists`
 
 ### GET /shopping-lists/
 **Description:** List shopping lists accessible to current user (public + own private)  
@@ -1237,7 +1237,7 @@ All shopping list endpoints are under `/shopping-lists/`
 
 ## Backup & Restore
 
-All backup endpoints are under `/backup/` and require **ADMIN** role.
+All backup endpoints are under `/backup` and require **ADMIN** role.
 
 ### POST /backup/create/full
 **Description:** Create full database backup  
