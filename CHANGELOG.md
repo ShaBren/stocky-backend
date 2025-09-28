@@ -5,6 +5,18 @@ All notable changes to Stocky Backend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-09-28
+
+### Added
+- **Persistent Login Sessions**: Complete "Remember Me" functionality for enhanced user experience
+  - Optional `remember_me` parameter in login endpoints for 30-day persistent sessions
+  - HTTP-only cookie storage for refresh tokens (XSS and CSRF protection)
+  - Automatic token rotation on refresh for enhanced security
+  - Configurable cookie security settings (SECURE, SAMESITE, DOMAIN)
+  - Seamless logout with automatic cookie clearing
+  - Maintains short-lived access tokens (30 min) for API security
+  - Updated API documentation with persistent session details and usage examples
+
 ## [0.2.2] - 2025-09-27
 
 ### Fixed
