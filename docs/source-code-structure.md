@@ -2,8 +2,8 @@
 
 This document provides a comprehensive overview of every source file in the Stocky Backend application, organized by directory and functionality.
 
-**Last Updated:** September 27, 2025  
-**Total Files:** 19
+**Last Updated:** July 1, 2026  
+**Total Files:** 21
 
 ---
 
@@ -112,15 +112,17 @@ This document provides a comprehensive overview of every source file in the Stoc
 - UPC code management and lookups
 - Default storage type configuration
 - Item catalog organization
+- UPC lookup refresh (background task)
 
 **Endpoints:**
 - `GET /` - List all items (paginated)
-- `POST /` - Create new item
+- `POST /` - Create new item (background UPC lookup if UPC provided)
 - `GET /search` - Search items by name/UPC
 - `GET /{item_id}` - Get specific item details
 - `PUT /{item_id}` - Update item information
 - `DELETE /{item_id}` - Delete item (soft delete)
 - `GET /upc/{upc}` - Find item by UPC code
+- `POST /{item_id}/refresh-upc` - Manually trigger UPC data refresh (background)
 
 ---
 
@@ -167,14 +169,15 @@ This document provides a comprehensive overview of every source file in the Stoc
 ### `src/stocky_backend/api/endpoints/scanner.py`
 **Purpose:** Barcode scanner operations and device management  
 **Key Responsibilities:**
-- Barcode scanning and processing
+- Barcode scanning and processing (non-blocking — returns immediately)
+- Auto-creates stub items for unknown UPCs, backfills via background task
 - Scanner device association with users
 - UPC code lookups and external service integration
 - Scan result processing and suggested actions
 - Scanner status monitoring
 
 **Endpoints:**
-- `POST /scan` - Process barcode scan
+- `POST /scan` - Process barcode scan (optional auth, creates stub items)
 - `GET /status/{scanner_id}` - Get scanner device status
 - `POST /associate` - Associate scanner with user
 - `DELETE /associate/{scanner_id}` - Disassociate scanner
@@ -383,6 +386,53 @@ This document provides a comprehensive overview of every source file in the Stoc
 - **Search schemas:** `SearchRequest`, `SearchResponse`
 - **Backup schemas:** `BackupResponse`, `BackupImportRequest`, `BackupImportResponse`
 
+- `upc_data` JSON column on `Item` for raw UPC lookup response
+
+---
+
+## Service Layer
+
+### `src/stocky_backend/services/__init__.py`
+**Purpose:** Service layer package initialization and exports
+
+**Exports:**
+- `UPCLookupService` — UPC lookup HTTP client class
+- `upc_lookup_service` — Singleton instance of UPCLookupService
+- `fetch_and_update_item` — Background task for deferred UPC data backfill
+- `UNKNOWN_PRODUCT_NAME` — Placeholder name constant
+
+---
+
+### `src/stocky_backend/services/upc_lookup.py`
+**Purpose:** Remote UPC product data lookup via HTTP  
+**Key Responsibilities:**
+- Async HTTP client (`httpx`) for calling the UPC lookup service
+- Product name extraction from JSON response (`product_name` → `generic_name`)
+- Graceful error handling (timeouts, connection errors, non-200 responses)
+- Service availability check based on `UPC_SERVICE_BASE_URL` configuration
+
+**Key Class:**
+- `UPCLookupService` — Configured from `UPC_SERVICE_BASE_URL` and `UPC_SERVICE_TIMEOUT`
+  - `is_available()` — Check if service URL is configured
+  - `async fetch_product(upc)` — Fetch full product data dict or `None`
+  - `extract_product_name(data)` — Static method to pull name from response
+
+---
+
+### `src/stocky_backend/services/upc_background.py`
+**Purpose:** Background task for deferred UPC data population  
+**Key Responsibilities:**
+- Runs as a FastAPI `BackgroundTask` after the HTTP response is sent
+- Creates an independent DB session (request session is already closed)
+- Updates item with product name, `upc_data`, and fetch status flags
+- Creates `LogEntry` records on lookup failure (visible in frontend logs)
+
+**Key Function:**
+- `async fetch_and_update_item(upc, item_id)` — Fetch UPC data and update item atomically
+
+**Key Constant:**
+- `UNKNOWN_PRODUCT_NAME = "Unknown Product"` — Placeholder name for stub items
+
 ---
 
 ## CRUD Operations
@@ -463,4 +513,4 @@ main.py
 
 ---
 
-*This documentation reflects the current state of the Stocky Backend codebase as of September 21, 2025.*
+*This documentation reflects the current state of the Stocky Backend codebase as of July 1, 2026.*

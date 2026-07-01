@@ -73,6 +73,7 @@ class ItemCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     upc: Optional[str] = Field(None, min_length=8, max_length=20)
     default_storage_type: Optional[StorageType] = None
+    upc_data: Optional[Dict[str, Any]] = None
 
 
 class ItemUpdate(BaseModel):
@@ -82,6 +83,7 @@ class ItemUpdate(BaseModel):
     upc: Optional[str] = Field(None, min_length=8, max_length=20)
     default_storage_type: Optional[StorageType] = None
     is_active: Optional[bool] = None
+    upc_data: Optional[Dict[str, Any]] = None
 
 
 class ItemResponse(BaseSchema):
@@ -94,6 +96,7 @@ class ItemResponse(BaseSchema):
     is_active: bool
     uda_fetched: bool
     uda_fetch_attempted: bool
+    upc_data: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 

@@ -169,7 +169,10 @@ requirements-upgrade:
 
 # Docker testing commands
 docker-image:
-	docker buildx build --platform linux/amd64,linux/arm64 -t docker-registry.eruditio.net/stocky-backend:latest --push .
+	docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/stephenbryant/stocky-backend:latest --push .
+
+docker-image-local:
+	docker build -t stocky-backend:latest .
 
 docker-build-test:
 	docker build -t stocky-backend:test .

@@ -53,6 +53,8 @@ The following environment variables can be configured in `docker-compose.yml`:
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token expiration time |
 | `CORS_ORIGINS` | `["http://localhost:3000","http://127.0.0.1:3000"]` | Allowed CORS origins |
 | `CREATE_INITIAL_DATA` | `true` | Create initial database data |
+| `UPC_SERVICE_BASE_URL` | *(empty)* | Remote UPC lookup service URL (e.g. `http://10.0.0.200:8242`) |
+| `UPC_SERVICE_TIMEOUT` | `10` | UPC lookup request timeout in seconds |
 
 ### Production Configuration
 

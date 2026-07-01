@@ -5,6 +5,31 @@ All notable changes to Stocky Backend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-07-01 — The UPC Lookup Update
+
+### Added
+- **UPC Lookup Service Integration**: Automatic product data lookup from remote UPC service
+  - New `UPCLookupService` with async `httpx`-based HTTP client
+  - FastAPI `BackgroundTasks` integration — scanner performance is never impacted
+  - Unknown UPCs auto-create stub items instantly, product data backfills async
+  - New `upc_data` JSON column on `Item` stores full lookup response for frontend
+  - New `POST /items/{item_id}/refresh-upc` endpoint for manual re-fetch
+  - Lookup failures create `LogEntry` records visible in frontend
+  - Opt-in via `UPC_SERVICE_BASE_URL` environment variable (disabled by default)
+- **Configuration**: `UPC_SERVICE_BASE_URL` and `UPC_SERVICE_TIMEOUT` settings
+
+### Changed
+- `ItemCRUD.create` now accepts optional `upc_data`, `uda_fetched`, `uda_fetch_attempted` overrides
+- `POST /scanner/scan` creates stub items for unknown UPCs when service is configured
+- `POST /items/` triggers background UPC lookup when UPC provided
+- `ItemResponse` schema now includes `upc_data` field
+
+### Technical
+- Alembic migration `d68fadfe7373` adds `upc_data` JSON column to `items` table
+- New module: `services/upc_lookup.py` — UPC HTTP client and name extraction
+- New module: `services/upc_background.py` — background task with independent DB session
+- Updated Docker config, deployment docs, and API reference
+
 ## [0.2.3] - 2025-09-28
 
 ### Added

@@ -38,7 +38,11 @@ class Settings(BaseSettings):
     # UDA (Universal Data Application) settings
     UDA_BASE_URL: Optional[str] = None
     UDA_TIMEOUT: int = 5
-    
+
+    # UPC Lookup Service settings
+    UPC_SERVICE_BASE_URL: Optional[str] = None
+    UPC_SERVICE_TIMEOUT: int = 10
+
     # Logging settings
     LOG_LEVEL: str = "INFO"
     MAX_LOG_ENTRIES: int = 10000

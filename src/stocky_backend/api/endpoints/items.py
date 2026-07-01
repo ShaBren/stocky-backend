@@ -2,7 +2,7 @@
 Item management endpoints
 """
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from ...db.database import get_db
@@ -10,6 +10,8 @@ from ...crud.crud import ItemCRUD, LogEntryCRUD
 from ...schemas.schemas import ItemCreate, ItemUpdate, ItemResponse
 from ...core.security import require_user_role
 from ...models.models import LogEntry
+from ...services.upc_lookup import upc_lookup_service
+from ...services.upc_background import fetch_and_update_item, UNKNOWN_PRODUCT_NAME
 
 router = APIRouter()
 item_crud = ItemCRUD()
@@ -28,10 +30,16 @@ async def list_items(
 @router.post("/", response_model=ItemResponse)
 async def create_item(
     item: ItemCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user = Depends(require_user_role("manager"))
 ):
-    """Create a new item"""
+    """Create a new item.
+
+    If a UPC is provided and the UPC lookup service is available,
+    product data will be fetched in the background after the response
+    is sent. If no name was provided, a placeholder is used temporarily.
+    """
     # Check if item with same UPC already exists
     if item.upc:
         existing_item = item_crud.get_by_upc(db, upc=item.upc)
@@ -40,8 +48,23 @@ async def create_item(
                 status_code=400,
                 detail=f"Item with UPC {item.upc} already exists"
             )
-    
-    db_item = item_crud.create(db, obj_in=item, created_by_id=current_user.id)
+
+    # If UPC service is available and no name was provided, use placeholder
+    should_fetch_upc = (
+        upc_lookup_service.is_available()
+        and item.upc
+        and not item.upc_data
+    )
+
+    db_item = item_crud.create(
+        db,
+        obj_in=item,
+        created_by_id=current_user.id,
+        upc_data=None,
+        uda_fetched=False,
+        uda_fetch_attempted=False,
+    )
+
     # Log creation
     log_crud = LogEntryCRUD()
     log_entry = {
@@ -52,6 +75,11 @@ async def create_item(
         "user_id": current_user.id
     }
     log_crud.create(db, obj_in=log_entry)
+
+    # Schedule background UPC lookup if applicable
+    if should_fetch_upc:
+        background_tasks.add_task(fetch_and_update_item, item.upc, db_item.id)
+
     return db_item
 
 @router.get("/search", response_model=List[ItemResponse])
@@ -149,6 +177,52 @@ async def delete_item(
     }
     log_crud.create(db, obj_in=log_entry)
     return {"message": "Item deleted successfully"}
+
+@router.post("/{item_id}/refresh-upc")
+async def refresh_upc_data(
+    item_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_user_role("manager"))
+):
+    """Manually trigger a UPC lookup refresh for an existing item.
+
+    The refresh runs in the background — this endpoint returns immediately.
+    Use this to backfill upc_data for items created before the UPC lookup
+    service was configured.
+    """
+    item = item_crud.get(db, id=item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if not item.upc:
+        raise HTTPException(status_code=400, detail="Item has no UPC code")
+    if not upc_lookup_service.is_available():
+        raise HTTPException(status_code=503, detail="UPC lookup service is not configured")
+
+    # Reset fetch flags so the background task will re-fetch
+    item.uda_fetched = False
+    item.uda_fetch_attempted = False
+    db.commit()
+
+    background_tasks.add_task(fetch_and_update_item, item.upc, item.id)
+
+    # Log the manual refresh
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"UPC refresh triggered for item {item.name} (ID: {item.id}, UPC: {item.upc})",
+        "level": "INFO",
+        "module": "items",
+        "function": "refresh_upc_data",
+        "user_id": current_user.id,
+    }
+    log_crud.create(db, obj_in=log_entry)
+
+    return {
+        "message": f"UPC refresh scheduled for item {item_id}",
+        "item_id": item_id,
+        "upc": item.upc,
+    }
+
 
 @router.get("/upc/{upc}", response_model=ItemResponse)
 async def get_item_by_upc(

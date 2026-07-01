@@ -92,7 +92,10 @@ class Item(Base):
     # UDA (Universal Data Application) integration fields
     uda_fetched = Column(Boolean, default=False)
     uda_fetch_attempted = Column(Boolean, default=False)
-    
+
+    # Raw UPC lookup data from remote service (JSON blob for frontend)
+    upc_data = Column(JSON, nullable=True)
+
     # Foreign keys
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     

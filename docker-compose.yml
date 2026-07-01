@@ -12,6 +12,7 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
       - CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
       - CREATE_INITIAL_DATA=true
+      - UPC_SERVICE_BASE_URL=
     restart: unless-stopped
 
 volumes:

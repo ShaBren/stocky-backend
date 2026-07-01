@@ -108,12 +108,16 @@ class ItemCRUD(CRUDBase[Item, ItemCreate, ItemUpdate]):
             query = query.filter(Item.is_active)
         return query.offset(skip).limit(limit).all()
     
-    def create(self, db: Session, *, obj_in: ItemCreate, created_by_id: int = 1) -> Item:
+    def create(self, db: Session, *, obj_in: ItemCreate, created_by_id: int = 1,
+               upc_data: Optional[Dict[str, Any]] = None,
+               uda_fetched: bool = False,
+               uda_fetch_attempted: bool = False) -> Item:
         obj_data = obj_in.model_dump()
         obj_data['created_by'] = created_by_id
         obj_data['is_active'] = True
-        obj_data['uda_fetched'] = False
-        obj_data['uda_fetch_attempted'] = False
+        obj_data['uda_fetched'] = uda_fetched
+        obj_data['uda_fetch_attempted'] = uda_fetch_attempted
+        obj_data['upc_data'] = upc_data if upc_data is not None else obj_data.get('upc_data')
         db_obj = Item(**obj_data)
         db.add(db_obj)
         db.commit()

@@ -359,6 +359,7 @@ All item endpoints are under `/items`
     "is_active": true,
     "uda_fetched": false,
     "uda_fetch_attempted": false,
+    "upc_data": null,
     "created_at": "2025-09-20T10:00:00Z",
     "updated_at": "2025-09-20T10:00:00Z"
   }
@@ -368,7 +369,11 @@ All item endpoints are under `/items`
 ---
 
 ### POST /items/
-**Description:** Create new item  
+**Description:** Create new item
+
+If a UPC is provided and the UPC lookup service is configured, product
+data will be fetched in the background after the response is sent.
+
 **Authentication:** Bearer Token or API Key required
 
 **Request Body:**
@@ -386,6 +391,7 @@ All item endpoints are under `/items`
 - `description`: max 1000 characters, optional
 - `upc`: 8-20 characters, optional, unique if provided
 - `default_storage_type`: "PANTRY", "REFRIGERATOR", "FREEZER", "COUNTER", optional
+- `upc_data`: JSON object, optional (server-populated from UPC lookup)
 
 **Response:** `201 Created` (returns created item)
 
@@ -411,6 +417,7 @@ All item endpoints are under `/items`
     "is_active": true,
     "uda_fetched": false,
     "uda_fetch_attempted": false,
+    "upc_data": null,
     "created_at": "2025-09-20T10:00:00Z",
     "updated_at": "2025-09-20T10:00:00Z"
   }
@@ -473,6 +480,30 @@ All item endpoints are under `/items`
 
 **Error Responses:**
 - `404 Not Found`: Item with UPC not found
+
+---
+
+### POST /items/{item_id}/refresh-upc
+**Description:** Manually trigger a UPC lookup refresh for an existing item.
+The refresh runs in the background — the endpoint returns immediately.
+Use this to backfill `upc_data` for items created before the UPC lookup
+service was configured.
+
+**Authentication:** Bearer Token or API Key required (manager+)
+
+**Response:** `200 OK`
+```json
+{
+  "message": "UPC refresh scheduled for item 1",
+  "item_id": 1,
+  "upc": "123456789012"
+}
+```
+
+**Error Responses:**
+- `404 Not Found`: Item not found
+- `400 Bad Request`: Item has no UPC code
+- `503 Service Unavailable`: UPC lookup service is not configured
 
 ---
 
@@ -703,50 +734,66 @@ All SKU endpoints are under `/skus`
 All scanner endpoints are under `/scanner`
 
 ### POST /scanner/scan
-**Description:** Process barcode scan  
-**Authentication:** Bearer Token or API Key required
+**Description:** Process barcode scan.
+
+When a UPC is unknown and a UPC lookup service is configured, a stub item
+is created instantly (name: "Unknown Product") and product data is fetched
+in the background via `BackgroundTasks`. The scanner is never blocked —
+the response is immediate. The `uda_fetched` flag indicates when product
+data is available.
+
+**Authentication:** Bearer Token or API Key (optional — works without auth
+for stub item creation)
 
 **Request Body:**
 ```json
 {
-  "upc": "123456789012",
+  "upc": "072486002601",
   "scanner_id": "scanner_001",
   "location_hint": "Pantry"
 }
 ```
 
-**Response:** `200 OK`
+**Response (known item):** `200 OK`
 ```json
 {
   "success": true,
   "item": {
     "id": 1,
-    "name": "Apples",
-    "description": "Red apples",
-    "upc": "123456789012",
-    "default_storage_type": "PANTRY",
+    "name": "Muffin mix",
+    "description": null,
+    "upc": "072486002601",
+    "default_storage_type": null,
     "is_active": true,
+    "uda_fetched": true,
+    "uda_fetch_attempted": true,
+    "upc_data": { "product_name": "Muffin mix", "brands": "...", "..." },
+    "created_at": "2026-07-01T12:00:00Z",
+    "updated_at": "2026-07-01T12:00:00Z"
+  },
+  "skus": [],
+  "message": "Found item: Muffin mix",
+  "suggested_actions": []
+}
+```
+
+**Response (unknown UPC, stub created):** `200 OK`
+```json
+{
+  "success": true,
+  "item": {
+    "id": 2,
+    "name": "Unknown Product",
+    "description": null,
+    "upc": "012345678901",
     "uda_fetched": false,
     "uda_fetch_attempted": false,
-    "created_at": "2025-09-20T10:00:00Z",
-    "updated_at": "2025-09-20T10:00:00Z"
+    "upc_data": null,
+    "..."
   },
-  "skus": [
-    {
-      "id": 1,
-      "quantity": 5.0,
-      "unit": "pieces",
-      "expiry_date": null,
-      "notes": null,
-      "is_active": true,
-      "item_id": 1,
-      "location_id": 1,
-      "created_at": "2025-09-20T10:00:00Z",
-      "updated_at": "2025-09-20T10:00:00Z"
-    }
-  ],
-  "message": "Item found in inventory",
-  "suggested_actions": ["Update quantity", "Check expiry date"]
+  "skus": [],
+  "message": "New item registered, product details loading...",
+  "suggested_actions": []
 }
 ```
 
@@ -1435,6 +1482,8 @@ PORT="8000"                     # Server port
 # External Services (Optional)
 UDA_BASE_URL="https://uda-service.com"  # External UPC data service
 UDA_TIMEOUT="5"                 # UDA service timeout in seconds
+UPC_SERVICE_BASE_URL="http://10.0.0.200:8242"  # Remote UPC lookup service
+UPC_SERVICE_TIMEOUT="10"         # UPC lookup timeout in seconds
 
 # Logging (Optional)
 LOG_LEVEL="INFO"                # DEBUG, INFO, WARNING, ERROR
