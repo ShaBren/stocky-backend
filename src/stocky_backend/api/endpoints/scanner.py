@@ -56,6 +56,7 @@ async def scanner_scan(
             # The UPC lookup will backfill name + upc_data in the background.
             stub_create = ItemCreate(
                 name=UNKNOWN_PRODUCT_NAME,
+                description=None,
                 upc=upc,
             )
             item = item_crud.create(
