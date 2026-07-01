@@ -1,6 +1,7 @@
 """
 Stocky Backend - Main application entry point
 """
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +30,7 @@ def create_app() -> FastAPI:
         version=__version__,
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
-        lifespan=lifespan
+        lifespan=lifespan,
     )
 
     # Add CORS middleware

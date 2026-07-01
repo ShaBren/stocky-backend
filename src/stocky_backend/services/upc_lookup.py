@@ -1,6 +1,7 @@
 """
 UPC Lookup Service - fetches product data from a remote UPC lookup service.
 """
+
 import logging
 from typing import Optional, Dict, Any
 
@@ -45,7 +46,9 @@ class UPCLookupService:
                 logger.info("UPC lookup succeeded for %s", upc)
                 return data
         except httpx.TimeoutException:
-            logger.warning("UPC lookup timed out for %s (timeout=%ds)", upc, self.timeout)
+            logger.warning(
+                "UPC lookup timed out for %s (timeout=%ds)", upc, self.timeout
+            )
             return None
         except httpx.HTTPStatusError as e:
             logger.warning("UPC lookup HTTP %d for %s", e.response.status_code, upc)
@@ -54,7 +57,9 @@ class UPCLookupService:
             logger.warning("UPC lookup connection error for %s: %s", upc, e)
             return None
         except Exception as e:
-            logger.warning("UPC lookup unexpected error for %s: %s", upc, type(e).__name__)
+            logger.warning(
+                "UPC lookup unexpected error for %s: %s", upc, type(e).__name__
+            )
             return None
 
     @staticmethod

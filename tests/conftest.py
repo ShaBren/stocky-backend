@@ -26,6 +26,7 @@ from src.stocky_backend.models.models import User, UserRole
 # Session-scoped fixtures (expensive setup/teardown)
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -49,20 +50,20 @@ def test_engine(test_db_url):
         poolclass=None,
         echo=False,  # Set to True for SQL debugging
     )
-    
+
     # Enable foreign key constraints for SQLite
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
-        if 'sqlite' in str(dbapi_connection):
+        if "sqlite" in str(dbapi_connection):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
-    
+
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    
+
     yield engine
-    
+
     # Cleanup
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
@@ -78,19 +79,20 @@ def TestingSessionLocal(test_engine):
 # Function-scoped fixtures (clean state for each test)
 # ============================================================================
 
+
 @pytest.fixture
 def db_session(test_engine):
     """
     Provide a clean database session for each test.
-    
+
     Uses transaction rollback to ensure test isolation.
     """
     connection = test_engine.connect()
     transaction = connection.begin()
     session = sessionmaker(autocommit=False, autoflush=False, bind=connection)()
-    
+
     yield session
-    
+
     session.close()
     transaction.rollback()
     connection.close()
@@ -99,12 +101,13 @@ def db_session(test_engine):
 @pytest.fixture
 def override_get_db(db_session):
     """Override the get_db dependency with test database session."""
+
     def _override_get_db():
         try:
             yield db_session
         finally:
             pass  # Session cleanup handled by db_session fixture
-    
+
     app.dependency_overrides[get_db] = _override_get_db
     yield
     app.dependency_overrides.clear()
@@ -114,10 +117,12 @@ def override_get_db(db_session):
 async def async_client(override_get_db) -> AsyncGenerator[AsyncClient, None]:
     """
     Provide an async HTTP client for API testing.
-    
+
     This client uses the test database and handles proper cleanup.
     """
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
         yield client
 
 
@@ -125,16 +130,17 @@ async def async_client(override_get_db) -> AsyncGenerator[AsyncClient, None]:
 # Authentication fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def admin_user(db_session) -> User:
     """Create an admin user for testing."""
     from tests.factories.user_factory import UserFactory
-    
+
     user = UserFactory.create(
         username="admin_test",
         email="admin@test.com",
         role=UserRole.ADMIN,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -146,12 +152,12 @@ def admin_user(db_session) -> User:
 def regular_user(db_session) -> User:
     """Create a regular user for testing."""
     from tests.factories.user_factory import UserFactory
-    
+
     user = UserFactory.create(
         username="user_test",
         email="user@test.com",
         role=UserRole.MEMBER,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -163,12 +169,12 @@ def regular_user(db_session) -> User:
 def inactive_user(db_session) -> User:
     """Create an inactive user for testing."""
     from tests.factories.user_factory import UserFactory
-    
+
     user = UserFactory.create(
         username="inactive_test",
         email="inactive@test.com",
         role=UserRole.MEMBER,
-        is_active=False
+        is_active=False,
     )
     db_session.add(user)
     db_session.commit()
@@ -204,6 +210,7 @@ def auth_headers_user(user_token) -> dict:
 # Mock fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_settings():
     """Provide mock settings for testing."""
@@ -235,6 +242,7 @@ def temp_dir():
 # Test data fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def sample_user_data():
     """Provide sample user data for testing."""
@@ -243,7 +251,7 @@ def sample_user_data():
         "email": "test@example.com",
         "password": "testpassword123",
         "role": UserRole.MEMBER,
-        "is_active": True
+        "is_active": True,
     }
 
 
@@ -256,7 +264,7 @@ def sample_item_data():
         "barcode": "1234567890123",
         "category": "Test Category",
         "unit_price": 9.99,
-        "is_active": True
+        "is_active": True,
     }
 
 
@@ -267,13 +275,14 @@ def sample_location_data():
         "name": "Test Location",
         "description": "A test location for unit testing",
         "location_type": "WAREHOUSE",
-        "is_active": True
+        "is_active": True,
     }
 
 
 # ============================================================================
 # Utility fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def capture_logs(caplog):
@@ -294,6 +303,7 @@ def reset_environment():
 # ============================================================================
 # Pytest hooks and configuration
 # ============================================================================
+
 
 def pytest_configure(config):
     """Configure pytest with custom settings."""
@@ -321,11 +331,11 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.api)
         elif "e2e" in str(item.fspath):
             item.add_marker(pytest.mark.e2e)
-        
+
         # Add auth marker for auth-related tests
         if "auth" in str(item.fspath) or "auth" in item.name:
             item.add_marker(pytest.mark.auth)
-        
+
         # Add database marker for database tests
         if any(marker in str(item.fspath) for marker in ["database", "crud", "models"]):
             item.add_marker(pytest.mark.database)

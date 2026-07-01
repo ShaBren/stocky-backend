@@ -168,6 +168,6 @@ jobs:
       uses: actions/upload-artifact/merge@v4
       with:
         name: all-coverage-reports
-        pattern: coverage-report-python-*
+        pattern: coverage-report-py*
         delete-merged: true
         retention-days: 30
