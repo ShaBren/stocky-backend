@@ -42,8 +42,11 @@ else:
 
 case "$DB_STATE" in
     STAMP_NEEDED)
-        echo "Existing database detected (no migration history). Stamping head..."
-        alembic stamp head
+        echo "Existing database detected (no migration history)."
+        # Stamp only the initial migration (tables already from create_all),
+        # then run upgrade for remaining migrations (shopping lists, upc_data)
+        echo "Stamping initial migration, then applying pending migrations..."
+        alembic stamp 7893c84217f9
         alembic upgrade head
         ;;
     FRESH)
@@ -52,6 +55,33 @@ case "$DB_STATE" in
         ;;
     UPGRADE)
         echo "Running pending migrations..."
+        # Verify schema matches stamp — 0.2.7 stamp bug may have
+        # marked upc_data migration done without applying it
+        HAS_UPC_DATA=$(python -c "
+from sqlalchemy import create_engine, inspect
+from stocky_backend.core.config import settings
+url = settings.DATABASE_URL
+if 'pysqlite' in url:
+    url = url.replace('sqlite+pysqlite', 'sqlite')
+engine = create_engine(url)
+cols = [c['name'] for c in inspect(engine).get_columns('items')]
+print('yes' if 'upc_data' in cols else 'no')
+" 2>/dev/null || echo "no")
+        if [ "$HAS_UPC_DATA" = "no" ]; then
+            echo "upc_data column missing — applying directly..."
+            python -c "
+from sqlalchemy import create_engine, text
+from stocky_backend.core.config import settings
+url = settings.DATABASE_URL
+if 'pysqlite' in url:
+    url = url.replace('sqlite+pysqlite', 'sqlite')
+engine = create_engine(url)
+with engine.connect() as conn:
+    conn.execute(text('ALTER TABLE items ADD COLUMN upc_data JSON'))
+    conn.commit()
+"
+            alembic stamp d68fadfe7373
+        fi
         alembic upgrade head
         ;;
     *)
