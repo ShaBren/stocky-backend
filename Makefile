@@ -116,23 +116,19 @@ test-external:
 
 # Quality assurance commands
 lint:
-	flake8 src/ tests/
-	pylint src/ tests/ || true
+	ruff check src/ tests/
 
 format:
-	black src/ tests/
-	isort src/ tests/
+	ruff format src/ tests/
 
 format-check:
-	black --check src/ tests/
-	isort --check src/ tests/
+	ruff format --check src/ tests/
 
 type-check:
 	mypy src/ --ignore-missing-imports
 
 security-scan:
-	safety check
-	bandit -r src/
+	ruff check src/ --select=S
 
 # Performance testing
 test-performance:

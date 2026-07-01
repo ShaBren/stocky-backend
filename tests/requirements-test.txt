@@ -26,6 +26,6 @@ pytest-benchmark>=4.0.0
 pytest-html>=3.2.0
 pytest-json-report>=1.5.0
 
-# Linting and code quality for tests
-pytest-flake8>=1.1.1
+# Linting and code quality (ruff replaces flake8)
+ruff>=0.1.0
 pytest-mypy>=0.10.3
