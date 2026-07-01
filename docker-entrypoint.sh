@@ -18,7 +18,7 @@ echo "Running database migrations..."
 # Detect database state: fresh (no tables), existing without alembic history,
 # or normal (has alembic_version table)
 DB_STATE=$(python -c "
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from stocky_backend.core.config import settings
 url = settings.DATABASE_URL
 if 'pysqlite' in url:
@@ -31,7 +31,13 @@ if not tables:
 elif 'alembic_version' not in tables:
     print('STAMP_NEEDED')
 else:
-    print('UPGRADE')
+    # alembic_version exists — check if it has a revision
+    with engine.connect() as conn:
+        row = conn.execute(text('SELECT version_num FROM alembic_version LIMIT 1')).first()
+    if row and row[0]:
+        print('UPGRADE')
+    else:
+        print('STAMP_NEEDED')  # table exists but empty
 " 2>/dev/null || echo "FALLBACK")
 
 case "$DB_STATE" in
