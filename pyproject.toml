@@ -63,6 +63,11 @@ ignore = [
     "E501",  # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"src/stocky_backend/api/endpoints/backup.py" = ["S603", "S607"]  # admin-only subprocess calls
+"src/stocky_backend/core/config.py" = ["S104", "S105"]  # Docker bind + default key placeholder
+"src/stocky_backend/schemas/schemas.py" = ["S105"]  # "bearer" token type string
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
