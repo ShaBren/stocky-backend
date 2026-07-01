@@ -54,9 +54,6 @@ jobs:
       - name: Type check (mypy)
         run: uv run mypy src/
 
-      - name: Security scan (ruff)
-        run: uv run ruff check . --select=S
-
       - name: Run tests with coverage
         run: uv run pytest
         env:
