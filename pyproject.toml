@@ -102,7 +102,6 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--strict-markers",
-    "--strict-config",
     "-ra",
 ]
 markers = [
