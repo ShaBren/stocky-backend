@@ -118,10 +118,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker rm -f stocky-test 2>/dev/null || true
-        
-        # Stop the container
-        docker stop stocky-test
-        docker rm stocky-test
 
   performance-test:
     runs-on: ubuntu-latest
