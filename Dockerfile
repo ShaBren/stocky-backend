@@ -33,6 +33,7 @@ COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/src /app/src
 COPY --from=build /app/alembic /app/alembic
 COPY --from=build /app/alembic.ini /app/alembic.ini
+COPY --from=build /app/pyproject.toml /app/pyproject.toml
 COPY --from=build /app/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Create data directory
