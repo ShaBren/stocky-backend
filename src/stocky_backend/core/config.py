@@ -56,13 +56,24 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        """Convert ALLOWED_ORIGINS string to list for CORS middleware"""
-        if isinstance(self.ALLOWED_ORIGINS, str):
-            if "," in self.ALLOWED_ORIGINS:
-                return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
-            else:
-                return [self.ALLOWED_ORIGINS.strip()]
-        return self.ALLOWED_ORIGINS
+        """Convert ALLOWED_ORIGINS string to list for CORS middleware.
+
+        Supports both comma-separated and JSON array formats.
+        """
+        origins = self.ALLOWED_ORIGINS
+        if isinstance(origins, str):
+            origins = origins.strip()
+            # Detect JSON array format: ["a", "b"]
+            if origins.startswith("[") and origins.endswith("]"):
+                import json
+
+                try:
+                    origins = json.loads(origins)
+                except json.JSONDecodeError:
+                    pass
+            if isinstance(origins, str):
+                return [o.strip().strip('"') for o in origins.split(",") if o.strip()]
+        return list(origins) if origins else []
 
     model_config = {"env_file": ".env", "case_sensitive": True}
 
