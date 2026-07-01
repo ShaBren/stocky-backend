@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ...core.security import require_user_role
 from ...crud.crud import ItemCRUD, LogEntryCRUD
 from ...db.database import get_db
+from ...models.models import Item
 from ...schemas.schemas import ItemCreate, ItemResponse, ItemUpdate
 from ...services.upc_background import fetch_and_update_item
 from ...services.upc_lookup import upc_lookup_service
@@ -221,6 +222,53 @@ async def refresh_upc_data(
         "message": f"UPC refresh scheduled for item {item_id}",
         "item_id": item_id,
         "upc": item.upc,
+    }
+
+
+@router.post("/refresh-upc-missing")
+async def refresh_missing_upc_data(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_user_role("manager")),
+):
+    """Trigger UPC lookup for ALL items that are missing product data.
+
+    Finds every item that has a UPC but hasn't been enriched yet
+    (uda_fetched=False) and schedules a background UPC lookup for each.
+    Returns immediately with a count of scheduled refreshes.
+
+    Useful after first configuring the UPC lookup service, or after
+    bulk-importing items with UPCs but no product data.
+    """
+    if not upc_lookup_service.is_available():
+        raise HTTPException(status_code=503, detail="UPC lookup service is not configured")
+
+    items = (
+        db.query(Item)
+        .filter(Item.upc.isnot(None), Item.upc != "", Item.uda_fetched == False)  # noqa: E712
+        .all()
+    )
+
+    count = 0
+    for item in items:
+        background_tasks.add_task(fetch_and_update_item, item.upc, item.id)
+        count += 1
+
+    # Log the batch refresh
+    log_crud = LogEntryCRUD()
+    log_entry = {
+        "message": f"Batch UPC refresh triggered for {count} items",
+        "level": "INFO",
+        "module": "items",
+        "function": "refresh_missing_upc_data",
+        "user_id": current_user.id,
+        "extra_data": {"count": count},
+    }
+    log_crud.create(db, obj_in=log_entry)
+
+    return {
+        "message": f"UPC refresh scheduled for {count} items",
+        "count": count,
     }
 
 
