@@ -5,6 +5,41 @@ All notable changes to Stocky Backend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-07-01 — The Tooling Modernization Update
+
+### Changed
+- **Build system**: setuptools → hatchling with explicit `[build-system]`
+- **Package manager**: pip/pip-tools → uv with committed `uv.lock` for reproducible builds
+- **Auth library**: python-jose → PyJWT (maintained fork, drop-in replacement)
+- **Dependencies**: Dropped unused passlib (code uses bcrypt directly)
+- **CI/CD**: Modernized GitHub Actions with `astral-sh/setup-uv`, fixed action versions
+- **Docker**: Multi-stage build with uv, HEALTHCHECK, alembic migrations on startup
+- **Docker Compose**: Added `env_file`, healthcheck, normalized env vars
+- **Linting**: flake8/bandit/safety → single ruff toolchain
+- **Testing**: pytest.ini + requirements-test.txt → consolidated into pyproject.toml
+- **Makefile**: Rewritten — all commands via `uv run`, reduced from 190 to 80 lines
+- **Documentation**: Refreshed README, TESTING, DEPLOYMENT with uv workflow
+
+### Added
+- `.python-version` (Python 3.13)
+- `.pre-commit-config.yaml` (ruff + mypy hooks)
+- `.github/dependabot.yml` (monthly action updates)
+- `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]` configs in pyproject.toml
+- Per-file ruff ignore rules for backup.py, config.py, schemas.py
+
+### Fixed
+- CI: checkout, codecov, setup-uv actions at correct major versions
+- CI: missing psycopg2 driver for PostgreSQL tests
+- pytest 9.x compatibility (removed deprecated `--strict-config`)
+- Backup tests skipped on non-file-SQLite databases (CI uses PostgreSQL)
+- JWT test updated for PyJWT exception types
+- release.yml YAML syntax error (separated name/uses lines)
+
+### Removed
+- `scripts/test_runner.py` (replaced by Makefile targets)
+- `tests/requirements-test.txt` (consolidated into pyproject.toml dependency groups)
+- `pytest.ini` (migrated to pyproject.toml)
+
 ## [0.2.4] - 2026-07-01 — The UPC Lookup Update
 
 ### Added

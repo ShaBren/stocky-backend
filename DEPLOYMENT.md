@@ -16,7 +16,7 @@ This guide covers deploying the Stocky Backend using Docker. The application is 
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ShaBren/stocky-backend.git
 cd stocky-backend
 ```
 
@@ -43,18 +43,19 @@ Expected response:
 
 ### Environment Variables
 
-The following environment variables can be configured in `docker-compose.yml`:
+Configure via `docker-compose.yml` or a `.env` file:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite+pysqlite:///./data/stocky.db` | Database connection string |
-| `SECRET_KEY` | `your-secret-key-change-in-production-v001` | JWT signing key (CHANGE IN PRODUCTION) |
+| `SECRET_KEY` | *(placeholder)* | JWT signing key (**required** in production) |
 | `ALGORITHM` | `HS256` | JWT algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token expiration time |
-| `CORS_ORIGINS` | `["http://localhost:3000","http://127.0.0.1:3000"]` | Allowed CORS origins |
-| `CREATE_INITIAL_DATA` | `true` | Create initial database data |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated CORS origins |
 | `UPC_SERVICE_BASE_URL` | *(empty)* | Remote UPC lookup service URL (e.g. `http://10.0.0.200:8242`) |
 | `UPC_SERVICE_TIMEOUT` | `10` | UPC lookup request timeout in seconds |
+| `DEBUG` | `false` | Enable debug mode (exposes /docs, /redoc) |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
 ### Production Configuration
 
@@ -63,29 +64,36 @@ For production deployment, ensure you:
 1. **Change the SECRET_KEY**:
    ```yaml
    environment:
-     - SECRET_KEY=your-super-secure-secret-key-here
+     - SECRET_KEY=your-64-character-hex-secret-key
    ```
+   Generate: `openssl rand -hex 32`
 
-2. **Configure CORS origins** for your frontend:
+2. **Configure ALLOWED_ORIGINS** for your frontend:
    ```yaml
    environment:
-     - CORS_ORIGINS=["https://yourdomain.com","https://www.yourdomain.com"]
+     - ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
    ```
 
-3. **Use external database** (optional):
+3. **Use PostgreSQL** (optional):
    ```yaml
    environment:
-     - DATABASE_URL=postgresql://user:password@host:port/database
+     - DATABASE_URL=postgresql://user:password@host:5432/stocky
    ```
 
-## Docker Configuration
+## Docker Image
 
-### Build Options
+Pre-built multi-arch images are available from GitHub Container Registry:
 
-Build the image manually:
+```bash
+docker pull ghcr.io/shabren/stocky-backend:latest
+```
+
+To build locally:
 ```bash
 docker build -t stocky-backend:latest .
 ```
+
+The Dockerfile uses a multi-stage build with uv for fast, lean images.
 
 ### Volume Management
 
