@@ -57,7 +57,7 @@ jobs:
       - name: Lint & format (ruff)
         run: |
           pip install ruff
-          ruff check . --select=E9,F63,F7,F82 --show-source
+          ruff check . --select=E9,F63,F7,F82
           ruff format --check .
 
       - name: Type check (mypy)
@@ -66,7 +66,7 @@ jobs:
           mypy src/ --ignore-missing-imports
 
       - name: Security scan (ruff)
-        run: ruff check . --select=S --show-source
+        run: ruff check . --select=S
 
       - name: Run test suite with coverage
         run: python scripts/test_runner.py --category all --coverage --verbose
