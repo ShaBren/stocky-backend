@@ -9,8 +9,8 @@ Usage:
     python scripts/initial_data.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the src directory to the Python path
@@ -18,13 +18,13 @@ current_path = Path(__file__).parent.parent
 src_path = current_path / "src"
 sys.path.insert(0, str(src_path))
 
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 import getpass
 
-from stocky_backend.db.database import SessionLocal, engine
-from stocky_backend.models.models import User, UserRole, StorageType, Location
-from stocky_backend.core.config import settings
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from stocky_backend.db.database import SessionLocal
+from stocky_backend.models.models import Location, StorageType, User, UserRole
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

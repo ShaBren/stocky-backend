@@ -2,23 +2,22 @@
 Authentication endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from ...db.database import get_db
-from ...models.models import User
+
 from ...core.auth import (
-    verify_password,
-    create_token_response,
-    generate_api_key,
-    create_persistent_token_response,
-    set_refresh_token_cookie,
     clear_refresh_token_cookie,
+    create_persistent_token_response,
+    generate_api_key,
     get_refresh_token_from_cookie,
-    verify_token_payload,
+    set_refresh_token_cookie,
+    verify_password,
 )
 from ...core.security import get_current_active_user
-from ...schemas.schemas import Token, LoginRequest, UserResponse
+from ...db.database import get_db
+from ...models.models import User
+from ...schemas.schemas import LoginRequest, Token, UserResponse
 
 router = APIRouter()
 
@@ -45,9 +44,7 @@ async def refresh_token(
 
     # If this was a cookie-based session, update the cookie with the new refresh token
     if is_persistent_session:
-        set_refresh_token_cookie(
-            response, token_response["refresh_token"], persistent=True
-        )
+        set_refresh_token_cookie(response, token_response["refresh_token"], persistent=True)
 
     return Token(**token_response)
 
@@ -92,17 +89,13 @@ async def login(
 
     # Set refresh token in cookie if remember_me is enabled
     if remember_me:
-        set_refresh_token_cookie(
-            response, token_response["refresh_token"], persistent=True
-        )
+        set_refresh_token_cookie(response, token_response["refresh_token"], persistent=True)
 
     return Token(**token_response)
 
 
 @router.post("/login-json", response_model=Token)
-async def login_json(
-    login_data: LoginRequest, response: Response, db: Session = Depends(get_db)
-):
+async def login_json(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     """User login with JSON payload to get JWT token"""
 
     # Get user from database
@@ -128,17 +121,13 @@ async def login_json(
 
     # Set refresh token in cookie if remember_me is enabled
     if login_data.remember_me:
-        set_refresh_token_cookie(
-            response, token_response["refresh_token"], persistent=True
-        )
+        set_refresh_token_cookie(response, token_response["refresh_token"], persistent=True)
 
     return Token(**token_response)
 
 
 @router.post("/logout")
-async def logout(
-    response: Response, current_user: User = Depends(get_current_active_user)
-):
+async def logout(response: Response, current_user: User = Depends(get_current_active_user)):
     """User logout endpoint (clears cookies and client should discard tokens)"""
     # Clear refresh token cookie if it exists
     clear_refresh_token_cookie(response)

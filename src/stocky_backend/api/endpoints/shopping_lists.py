@@ -2,28 +2,29 @@
 Shopping Lists management endpoints
 """
 
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 import json
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from ...core.security import get_current_active_user
+from ...crud.crud import item as item_crud
+from ...crud.crud import shopping_list
 from ...db.database import get_db
-from ...crud.crud import shopping_list, item as item_crud
+from ...models.models import User
 from ...schemas.schemas import (
+    PaginatedShoppingListLogsResponse,
+    PaginatedShoppingListsResponse,
     ShoppingListCreate,
-    ShoppingListUpdate,
     ShoppingListDuplicate,
+    ShoppingListItemCreate,
+    ShoppingListItemResponse,
+    ShoppingListItemUpdate,
+    ShoppingListLogResponse,
     ShoppingListResponse,
     ShoppingListSummary,
-    ShoppingListItemCreate,
-    ShoppingListItemUpdate,
-    ShoppingListItemResponse,
-    ShoppingListLogResponse,
-    PaginatedShoppingListsResponse,
-    PaginatedShoppingListLogsResponse,
+    ShoppingListUpdate,
 )
-from ...core.security import get_current_active_user
-from ...models.models import User
 
 router = APIRouter()
 
@@ -32,9 +33,7 @@ router = APIRouter()
 async def list_shopping_lists(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    include_deleted: bool = Query(
-        False, description="Include deleted lists (admin only)"
-    ),
+    include_deleted: bool = Query(False, description="Include deleted lists (admin only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -64,9 +63,7 @@ async def list_shopping_lists(
         )
         summaries.append(summary)
 
-    return PaginatedShoppingListsResponse(
-        items=summaries, total=total, skip=skip, limit=limit
-    )
+    return PaginatedShoppingListsResponse(items=summaries, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{list_id}", response_model=ShoppingListResponse)
@@ -107,9 +104,7 @@ async def get_shopping_list(
     )
 
 
-@router.post(
-    "/", response_model=ShoppingListResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/", response_model=ShoppingListResponse, status_code=status.HTTP_201_CREATED)
 async def create_shopping_list(
     list_data: ShoppingListCreate,
     db: Session = Depends(get_db),
@@ -221,9 +216,7 @@ async def duplicate_shopping_list(
             detail="Shopping list not found or access denied",
         )
 
-    duplicated_list = shopping_list.duplicate(
-        db, source_list, duplicate_data, current_user
-    )
+    duplicated_list = shopping_list.duplicate(db, source_list, duplicate_data, current_user)
 
     # Get items for response
     active_items = []
@@ -278,14 +271,10 @@ async def add_item_to_shopping_list(
     # Verify that the item exists
     item_obj = item_crud.get(db, item_data.item_id)
     if not item_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     try:
-        list_item = shopping_list.add_item(
-            db, shopping_list_obj, item_data, current_user
-        )
+        list_item = shopping_list.add_item(db, shopping_list_obj, item_data, current_user)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -381,7 +370,7 @@ async def get_shopping_list_logs(
     list_id: int,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    action_type: Optional[str] = Query(None, description="Filter by action type"),
+    action_type: str | None = Query(None, description="Filter by action type"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):

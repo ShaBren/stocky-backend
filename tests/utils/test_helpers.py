@@ -3,7 +3,7 @@
 import asyncio
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -38,12 +38,12 @@ def timer():
 
 async def create_test_user(
     async_client: AsyncClient,
-    admin_headers: Dict[str, str],
+    admin_headers: dict[str, str],
     username: str = "testuser",
     email: str = "test@example.com",
     password: str = "testpass123",
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Helper to create a test user via API."""
     user_data = {
         "username": username,
@@ -54,9 +54,7 @@ async def create_test_user(
         **kwargs,
     }
 
-    response = await async_client.post(
-        "/api/v1/users/", json=user_data, headers=admin_headers
-    )
+    response = await async_client.post("/api/v1/users/", json=user_data, headers=admin_headers)
 
     assert response.status_code == 201
     return response.json()
@@ -72,13 +70,13 @@ async def login_user(async_client: AsyncClient, username: str, password: str) ->
     return response.json()["access_token"]
 
 
-def get_auth_headers(token: str) -> Dict[str, str]:
+def get_auth_headers(token: str) -> dict[str, str]:
     """Helper to create authorization headers from token."""
     return {"Authorization": f"Bearer {token}"}
 
 
 async def cleanup_test_users(
-    async_client: AsyncClient, admin_headers: Dict[str, str], usernames: List[str]
+    async_client: AsyncClient, admin_headers: dict[str, str], usernames: list[str]
 ) -> None:
     """Helper to cleanup test users after tests."""
     # Get all users
@@ -88,12 +86,10 @@ async def cleanup_test_users(
         all_users = response.json()
         for user in all_users:
             if user["username"] in usernames:
-                await async_client.delete(
-                    f"/api/v1/users/{user['id']}", headers=admin_headers
-                )
+                await async_client.delete(f"/api/v1/users/{user['id']}", headers=admin_headers)
 
 
-def assert_user_response_structure(user_data: Dict[str, Any]) -> None:
+def assert_user_response_structure(user_data: dict[str, Any]) -> None:
     """Assert that user response has expected structure."""
     required_fields = [
         "id",
@@ -120,15 +116,13 @@ def assert_user_response_structure(user_data: Dict[str, Any]) -> None:
     assert "hashed_password" not in user_data
 
 
-def assert_error_response_structure(error_data: Dict[str, Any]) -> None:
+def assert_error_response_structure(error_data: dict[str, Any]) -> None:
     """Assert that error response has expected structure."""
     assert "detail" in error_data
     assert isinstance(error_data["detail"], (str, list, dict))
 
 
-async def wait_for_condition(
-    condition_func, timeout: float = 5.0, interval: float = 0.1
-) -> bool:
+async def wait_for_condition(condition_func, timeout: float = 5.0, interval: float = 0.1) -> bool:
     """Wait for a condition to become true within timeout."""
     start_time = time.time()
 
@@ -144,7 +138,7 @@ async def wait_for_condition(
     return False
 
 
-def create_batch_users_data(count: int, prefix: str = "user") -> List[Dict[str, Any]]:
+def create_batch_users_data(count: int, prefix: str = "user") -> list[dict[str, Any]]:
     """Create test data for batch user creation."""
     return [
         {
@@ -169,25 +163,21 @@ class DatabaseTestHelper:
         return db_session.query(User).count()
 
     @staticmethod
-    def get_user_by_username(db_session: Session, username: str) -> Optional[User]:
+    def get_user_by_username(db_session: Session, username: str) -> User | None:
         """Get user by username from database."""
         from src.stocky_backend.models.models import User
 
         return db_session.query(User).filter(User.username == username).first()
 
     @staticmethod
-    def clear_test_users(
-        db_session: Session, exclude_usernames: List[str] = None
-    ) -> None:
+    def clear_test_users(db_session: Session, exclude_usernames: list[str] = None) -> None:
         """Clear test users from database, excluding specified usernames."""
         if exclude_usernames is None:
             exclude_usernames = []
 
         from src.stocky_backend.models.models import User
 
-        users_to_delete = (
-            db_session.query(User).filter(~User.username.in_(exclude_usernames)).all()
-        )
+        users_to_delete = db_session.query(User).filter(~User.username.in_(exclude_usernames)).all()
 
         for user in users_to_delete:
             db_session.delete(user)
@@ -198,9 +188,7 @@ class APITestHelper:
     """Helper class for API testing operations."""
 
     @staticmethod
-    async def get_user_count(
-        async_client: AsyncClient, admin_headers: Dict[str, str]
-    ) -> int:
+    async def get_user_count(async_client: AsyncClient, admin_headers: dict[str, str]) -> int:
         """Get total user count via API."""
         response = await async_client.get("/api/v1/users/", headers=admin_headers)
 
@@ -210,7 +198,7 @@ class APITestHelper:
 
     @staticmethod
     async def user_exists(
-        async_client: AsyncClient, admin_headers: Dict[str, str], username: str
+        async_client: AsyncClient, admin_headers: dict[str, str], username: str
     ) -> bool:
         """Check if user exists via API."""
         response = await async_client.get("/api/v1/users/", headers=admin_headers)
@@ -223,16 +211,14 @@ class APITestHelper:
     @staticmethod
     async def wait_for_user_creation(
         async_client: AsyncClient,
-        admin_headers: Dict[str, str],
+        admin_headers: dict[str, str],
         username: str,
         timeout: float = 5.0,
     ) -> bool:
         """Wait for user to be created and available via API."""
 
         async def check_user():
-            return await APITestHelper.user_exists(
-                async_client, admin_headers, username
-            )
+            return await APITestHelper.user_exists(async_client, admin_headers, username)
 
         return await wait_for_condition(check_user, timeout)
 
@@ -244,16 +230,14 @@ def generate_test_email(username: str, domain: str = "example.com") -> str:
 
 def generate_strong_password(length: int = 12) -> str:
     """Generate a strong test password."""
-    import string
     import secrets
+    import string
 
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def mask_sensitive_data(
-    data: Dict[str, Any], fields: List[str] = None
-) -> Dict[str, Any]:
+def mask_sensitive_data(data: dict[str, Any], fields: list[str] = None) -> dict[str, Any]:
     """Mask sensitive fields in test data for logging."""
     if fields is None:
         fields = ["password", "hashed_password", "access_token", "token"]
@@ -270,7 +254,7 @@ class TestDataValidator:
     """Validator for test data integrity."""
 
     @staticmethod
-    def validate_user_data(user_data: Dict[str, Any]) -> List[str]:
+    def validate_user_data(user_data: dict[str, Any]) -> list[str]:
         """Validate user data and return list of validation errors."""
         errors = []
 
@@ -299,6 +283,6 @@ class TestDataValidator:
         return errors
 
     @staticmethod
-    def is_valid_user_data(user_data: Dict[str, Any]) -> bool:
+    def is_valid_user_data(user_data: dict[str, Any]) -> bool:
         """Check if user data is valid."""
         return len(TestDataValidator.validate_user_data(user_data)) == 0

@@ -2,13 +2,13 @@
 Authentication utilities for JWT tokens and password hashing
 """
 
-from datetime import datetime, timedelta, UTC
-from typing import Optional, Dict, Any, Union, TYPE_CHECKING
 import secrets
 import string
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-from jose import JWTError, jwt
-from fastapi import HTTPException, status, Response, Request
+import jwt
+from fastapi import HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -77,35 +77,27 @@ def generate_api_key(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def create_access_token(
-    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
-) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token"""
     to_encode = data.copy()
 
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(UTC) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({"exp": expire})
 
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
-def verify_token_payload(token: str) -> Dict[str, Any]:
+def verify_token_payload(token: str) -> dict[str, Any]:
     """Verify and decode a JWT token"""
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -113,9 +105,7 @@ def verify_token_payload(token: str) -> Dict[str, Any]:
         )
 
 
-def create_token_response(
-    user_id: int, username: str, role: "UserRole"
-) -> Dict[str, Any]:
+def create_token_response(user_id: int, username: str, role: "UserRole") -> dict[str, Any]:
     """Create a complete token response"""
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=7)
@@ -126,9 +116,7 @@ def create_token_response(
         "role": role,
     }
 
-    access_token = create_access_token(
-        data=token_data, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data=token_data, expires_delta=access_token_expires)
 
     refresh_token = create_access_token(
         data={"sub": str(user_id), "type": "refresh"},
@@ -200,18 +188,16 @@ async def get_current_user(db: Session, token: str) -> "User":
 
         raise credentials_exception
 
-    except JWTError:
+    except jwt.PyJWTError:
         raise credentials_exception
 
 
-def verify_token_simple(token: str) -> Optional[Dict[str, Any]]:
+def verify_token_simple(token: str) -> dict[str, Any] | None:
     """Verify JWT token and return payload, or None if invalid."""
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except jwt.PyJWTError:
         return None
 
 
@@ -256,9 +242,7 @@ def set_refresh_token_cookie(
     """Set refresh token in HTTP-only cookie"""
     max_age = None
     if persistent:
-        max_age = (
-            settings.PERSISTENT_SESSION_EXPIRE_DAYS * 24 * 60 * 60
-        )  # Convert days to seconds
+        max_age = settings.PERSISTENT_SESSION_EXPIRE_DAYS * 24 * 60 * 60  # Convert days to seconds
     else:
         max_age = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
 
@@ -273,7 +257,7 @@ def set_refresh_token_cookie(
     )
 
 
-def get_refresh_token_from_cookie(request: Request) -> Optional[str]:
+def get_refresh_token_from_cookie(request: Request) -> str | None:
     """Get refresh token from HTTP-only cookie"""
     return request.cookies.get(settings.COOKIE_NAME)
 
@@ -291,7 +275,7 @@ def clear_refresh_token_cookie(response: Response) -> None:
 
 def create_persistent_token_response(
     user_id: int, username: str, role: "UserRole", remember_me: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a token response with optional persistent session support"""
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
@@ -307,9 +291,7 @@ def create_persistent_token_response(
         "role": role,
     }
 
-    access_token = create_access_token(
-        data=token_data, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data=token_data, expires_delta=access_token_expires)
 
     refresh_token = create_access_token(
         data={"sub": str(user_id), "type": "refresh"},

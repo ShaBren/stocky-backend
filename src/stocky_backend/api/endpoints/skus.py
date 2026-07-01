@@ -2,20 +2,19 @@
 SKU (inventory) management endpoints
 """
 
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ...db.database import get_db
-from ...crud.crud import SKUCRUD, LogEntryCRUD
-from ...schemas.schemas import SKUCreate, SKUUpdate, SKUResponse, SKUQuantityUpdate
 from ...core.security import require_user_role
+from ...crud.crud import SKUCRUD, LogEntryCRUD
+from ...db.database import get_db
+from ...schemas.schemas import SKUCreate, SKUQuantityUpdate, SKUResponse, SKUUpdate
 
 router = APIRouter()
 sku_crud = SKUCRUD()
 
 
-@router.get("/", response_model=List[SKUResponse])
+@router.get("/", response_model=list[SKUResponse])
 async def list_skus(
     skip: int = Query(0, ge=0, description="Number of SKUs to skip"),
     limit: int = Query(100, ge=1, le=500, description="Number of SKUs to return"),
@@ -27,9 +26,7 @@ async def list_skus(
 ):
     """List all SKUs (inventory items) with filtering options"""
     if location_id:
-        skus = sku_crud.get_by_location(
-            db, location_id=location_id, skip=skip, limit=limit
-        )
+        skus = sku_crud.get_by_location(db, location_id=location_id, skip=skip, limit=limit)
     elif item_id:
         skus = sku_crud.get_by_item(db, item_id=item_id, skip=skip, limit=limit)
     elif low_stock:
@@ -70,7 +67,7 @@ async def create_sku(
     return db_sku
 
 
-@router.get("/search", response_model=List[SKUResponse])
+@router.get("/search", response_model=list[SKUResponse])
 async def search_skus(
     q: str = Query(..., min_length=1, description="Search query"),
     skip: int = Query(0, ge=0, description="Number of SKUs to skip"),
@@ -191,7 +188,7 @@ async def delete_sku(
     return {"message": "SKU deleted successfully"}
 
 
-@router.get("/low-stock", response_model=List[SKUResponse])
+@router.get("/low-stock", response_model=list[SKUResponse])
 async def get_low_stock_items(
     skip: int = Query(0, ge=0, description="Number of SKUs to skip"),
     limit: int = Query(100, ge=1, le=500, description="Number of SKUs to return"),

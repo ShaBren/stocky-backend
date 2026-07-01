@@ -2,20 +2,19 @@
 Location management endpoints
 """
 
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ...db.database import get_db
-from ...crud.crud import LocationCRUD, LogEntryCRUD
-from ...schemas.schemas import LocationCreate, LocationUpdate, LocationResponse
 from ...core.security import require_user_role
+from ...crud.crud import LocationCRUD, LogEntryCRUD
+from ...db.database import get_db
+from ...schemas.schemas import LocationCreate, LocationResponse, LocationUpdate
 
 router = APIRouter()
 location_crud = LocationCRUD()
 
 
-@router.get("/", response_model=List[LocationResponse])
+@router.get("/", response_model=list[LocationResponse])
 async def list_locations(
     skip: int = Query(0, ge=0, description="Number of locations to skip"),
     limit: int = Query(100, ge=1, le=500, description="Number of locations to return"),
@@ -42,9 +41,7 @@ async def create_location(
             detail=f"Location with name '{location.name}' already exists",
         )
 
-    db_location = location_crud.create(
-        db, obj_in=location, created_by_id=current_user.id
-    )
+    db_location = location_crud.create(db, obj_in=location, created_by_id=current_user.id)
     # Log creation
     log_crud = LogEntryCRUD()
     log_entry = {
@@ -58,7 +55,7 @@ async def create_location(
     return db_location
 
 
-@router.get("/search", response_model=List[LocationResponse])
+@router.get("/search", response_model=list[LocationResponse])
 async def search_locations(
     q: str = Query(..., min_length=1, description="Search query"),
     skip: int = Query(0, ge=0, description="Number of locations to skip"),
@@ -112,9 +109,7 @@ async def update_location(
         old_value = getattr(db_location, field, None)
         if value != old_value:
             changes[field] = {"old": old_value, "new": value}
-    updated_location = location_crud.update(
-        db, db_obj=db_location, obj_in=location_update
-    )
+    updated_location = location_crud.update(db, db_obj=db_location, obj_in=location_update)
     # Log update
     log_crud = LogEntryCRUD()
     log_entry = {

@@ -2,9 +2,10 @@
 Tests for backup and restore functionality
 """
 
-import pytest
 import base64
 import gzip
+
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
@@ -20,9 +21,7 @@ class TestBackupAPI:
         self, async_client: AsyncClient, auth_headers_admin
     ):
         """Test that admin can create full backup"""
-        response = await async_client.post(
-            "/api/v1/backup/create/full", headers=auth_headers_admin
-        )
+        response = await async_client.post("/api/v1/backup/create/full", headers=auth_headers_admin)
 
         assert response.status_code == 200
         data = response.json()
@@ -38,9 +37,7 @@ class TestBackupAPI:
         self, async_client: AsyncClient, auth_headers_user
     ):
         """Test that regular user cannot create backup"""
-        response = await async_client.post(
-            "/api/v1/backup/create/full", headers=auth_headers_user
-        )
+        response = await async_client.post("/api/v1/backup/create/full", headers=auth_headers_user)
 
         assert response.status_code == 403
         detail = response.json()["detail"]
@@ -156,9 +153,7 @@ class TestBackupAPI:
         assert "Access denied" in detail or "Required roles" in detail
 
     @pytest.mark.asyncio
-    async def test_invalid_backup_data_base64(
-        self, async_client: AsyncClient, auth_headers_admin
-    ):
+    async def test_invalid_backup_data_base64(self, async_client: AsyncClient, auth_headers_admin):
         """Test error handling for invalid base64 data"""
         request_data = {"backup_data": "invalid_base64_data!@#$", "force": True}
 
@@ -172,9 +167,7 @@ class TestBackupAPI:
         assert "Invalid base64" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_invalid_backup_data_gzip(
-        self, async_client: AsyncClient, auth_headers_admin
-    ):
+    async def test_invalid_backup_data_gzip(self, async_client: AsyncClient, auth_headers_admin):
         """Test error handling for invalid gzip data"""
         # Valid base64 but invalid gzip
         invalid_data = base64.b64encode(b"not gzip data").decode("utf-8")
@@ -206,9 +199,7 @@ class TestBackupAPI:
             else:
                 response = await async_client.get(endpoint, headers=auth_headers_user)
 
-            assert response.status_code == 403, (
-                f"Endpoint {endpoint} should require admin access"
-            )
+            assert response.status_code == 403, f"Endpoint {endpoint} should require admin access"
             detail = response.json()["detail"]
             assert "Access denied" in detail or "Required roles" in detail
 

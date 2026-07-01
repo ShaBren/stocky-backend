@@ -118,8 +118,7 @@ class TestUserCRUDIntegration:
         """Test retrieving multiple users with database integration."""
         # Given
         users = [
-            UserFactory.create(username=f"user{i}", email=f"user{i}@example.com")
-            for i in range(5)
+            UserFactory.create(username=f"user{i}", email=f"user{i}@example.com") for i in range(5)
         ]
         for user in users:
             db_session.add(user)
@@ -237,8 +236,8 @@ class TestDatabaseTransactions:
         )
 
         # Create initial user
-        initial_user = crud.user.create(db=db_session, obj_in=user_data)
-        initial_count = len(crud.user.get_multi(db=db_session))
+        crud.user.create(db=db_session, obj_in=user_data)
+        len(crud.user.get_multi(db=db_session))
 
         # When - Try to create duplicate user (should fail)
         duplicate_created = False

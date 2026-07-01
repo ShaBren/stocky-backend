@@ -2,24 +2,24 @@
 Backup and restore endpoints for database management
 """
 
-import gzip
 import base64
 import binascii
-import tempfile
+import gzip
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect
 
-from ...core.security import require_admin
-from ...db.database import get_db, engine
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
+from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
+
 from ...core.config import settings
-from ...schemas.schemas import BackupResponse, BackupImportRequest, BackupImportResponse
+from ...core.security import require_admin
+from ...db.database import engine, get_db
 from ...models.models import User
+from ...schemas.schemas import BackupImportRequest, BackupImportResponse, BackupResponse
 
 router = APIRouter()
 
@@ -35,7 +35,7 @@ def get_database_file_path() -> str:
         )
 
 
-def get_table_names(db: Session) -> List[str]:
+def get_table_names(db: Session) -> list[str]:
     """Get list of all table names in the database"""
     inspector = inspect(engine)
     return inspector.get_table_names()
@@ -56,9 +56,7 @@ async def create_full_backup(
         table_names = get_table_names(db)
 
         # Create SQL dump using sqlite3
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=".sql", delete=False
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".sql", delete=False) as temp_file:
             result = subprocess.run(
                 ["sqlite3", db_path, ".dump"],
                 capture_output=True,
@@ -85,9 +83,7 @@ async def create_full_backup(
         )
 
     except subprocess.CalledProcessError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create database backup: {e.stderr}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create database backup: {e.stderr}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup creation failed: {str(e)}")
 
@@ -125,9 +121,7 @@ async def download_full_backup(
         )
 
     except subprocess.CalledProcessError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create database backup: {e.stderr}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create database backup: {e.stderr}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup creation failed: {str(e)}")
 
@@ -156,18 +150,14 @@ async def import_partial_backup(
         statements = [stmt.strip() for stmt in sql_data.split(";") if stmt.strip()]
 
         for statement in statements:
-            if statement.upper().startswith(
-                ("INSERT", "UPDATE", "CREATE TABLE", "CREATE INDEX")
-            ):
+            if statement.upper().startswith(("INSERT", "UPDATE", "CREATE TABLE", "CREATE INDEX")):
                 try:
                     result = db.execute(text(statement))
                     records_affected += result.rowcount if result.rowcount else 0
 
                     # Extract table name for tracking
                     if "INSERT INTO" in statement.upper():
-                        table_name = (
-                            statement.split("INSERT INTO")[1].split()[0].strip('`"')
-                        )
+                        table_name = statement.split("INSERT INTO")[1].split()[0].strip('`"')
                         tables_affected.add(table_name)
                     elif "UPDATE" in statement.upper():
                         table_name = statement.split("UPDATE")[1].split()[0].strip('`"')
@@ -194,13 +184,9 @@ async def import_partial_backup(
         )
 
     except binascii.Error:
-        raise HTTPException(
-            status_code=400, detail="Invalid base64 encoded backup data"
-        )
+        raise HTTPException(status_code=400, detail="Invalid base64 encoded backup data")
     except gzip.BadGzipFile:
-        raise HTTPException(
-            status_code=400, detail="Invalid gzip compressed backup data"
-        )
+        raise HTTPException(status_code=400, detail="Invalid gzip compressed backup data")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Backup import failed: {str(e)}")
@@ -240,9 +226,7 @@ async def import_full_backup(
 
         try:
             # Write SQL to temporary file and restore
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".sql", delete=False
-            ) as temp_file:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as temp_file:
                 temp_file.write(sql_data)
                 temp_file.flush()
 
@@ -287,17 +271,11 @@ async def import_full_backup(
             )
 
     except binascii.Error:
-        raise HTTPException(
-            status_code=400, detail="Invalid base64 encoded backup data"
-        )
+        raise HTTPException(status_code=400, detail="Invalid base64 encoded backup data")
     except gzip.BadGzipFile:
-        raise HTTPException(
-            status_code=400, detail="Invalid gzip compressed backup data"
-        )
+        raise HTTPException(status_code=400, detail="Invalid gzip compressed backup data")
     except subprocess.CalledProcessError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Database operation failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Database operation failed: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Full restore failed: {str(e)}")
 
@@ -314,9 +292,7 @@ async def upload_partial_backup(
     Admin access required.
     """
     if not file.filename.endswith(".sql.gz"):
-        raise HTTPException(
-            status_code=400, detail="File must be a gzipped SQL file (.sql.gz)"
-        )
+        raise HTTPException(status_code=400, detail="File must be a gzipped SQL file (.sql.gz)")
 
     try:
         # Read uploaded file
@@ -331,9 +307,7 @@ async def upload_partial_backup(
         return await import_partial_backup(import_request, db, current_user)
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"File upload and import failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"File upload and import failed: {str(e)}")
 
 
 @router.post("/upload/import/full", response_model=BackupImportResponse)
@@ -349,9 +323,7 @@ async def upload_full_backup(
     Admin access required.
     """
     if not file.filename.endswith(".sql.gz"):
-        raise HTTPException(
-            status_code=400, detail="File must be a gzipped SQL file (.sql.gz)"
-        )
+        raise HTTPException(status_code=400, detail="File must be a gzipped SQL file (.sql.gz)")
 
     try:
         # Read uploaded file
@@ -366,6 +338,4 @@ async def upload_full_backup(
         return await import_full_backup(import_request, db, current_user)
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"File upload and import failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"File upload and import failed: {str(e)}")

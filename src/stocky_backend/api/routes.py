@@ -5,16 +5,16 @@ Main API router that includes all endpoint modules
 from fastapi import APIRouter
 
 from .endpoints import (
+    alerts,
     auth,
-    users,
+    backup,
     items,
     locations,
-    skus,
-    scanner,
     logs,
-    alerts,
-    backup,
+    scanner,
     shopping_lists,
+    skus,
+    users,
 )
 
 # Create main API router
@@ -30,9 +30,7 @@ api_router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(backup.router, prefix="/backup", tags=["backup"])
-api_router.include_router(
-    shopping_lists.router, prefix="/shopping-lists", tags=["shopping-lists"]
-)
+api_router.include_router(shopping_lists.router, prefix="/shopping-lists", tags=["shopping-lists"])
 
 
 @api_router.get("/health")

@@ -7,20 +7,20 @@ This module provides common fixtures and configuration used across all test cate
 import asyncio
 import os
 import tempfile
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import Mock
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
+
 from src.stocky_backend.core.auth import create_access_token
 from src.stocky_backend.db.database import Base, get_db
 from src.stocky_backend.main import app
 from src.stocky_backend.models.models import User, UserRole
-
 
 # ============================================================================
 # Session-scoped fixtures (expensive setup/teardown)

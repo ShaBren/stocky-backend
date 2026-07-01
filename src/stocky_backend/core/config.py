@@ -2,9 +2,8 @@
 Core configuration settings for the Stocky Backend application
 """
 
-from typing import List, Optional
-from pydantic_settings import BaseSettings
 from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = False  # Set to True in production with HTTPS
     COOKIE_HTTPONLY: bool = True
     COOKIE_SAMESITE: str = "lax"  # "lax", "strict", or "none"
-    COOKIE_DOMAIN: Optional[str] = None  # Set for subdomain sharing
+    COOKIE_DOMAIN: str | None = None  # Set for subdomain sharing
 
     # Database settings - will be overridden by .env file
     DATABASE_URL: str = "sqlite+pysqlite:///./data/stocky.db"
@@ -37,11 +36,11 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
 
     # UDA (Universal Data Application) settings
-    UDA_BASE_URL: Optional[str] = None
+    UDA_BASE_URL: str | None = None
     UDA_TIMEOUT: int = 5
 
     # UPC Lookup Service settings
-    UPC_SERVICE_BASE_URL: Optional[str] = None
+    UPC_SERVICE_BASE_URL: str | None = None
     UPC_SERVICE_TIMEOUT: int = 10
 
     # Logging settings
@@ -56,7 +55,7 @@ class Settings(BaseSettings):
         return v
 
     @property
-    def allowed_origins_list(self) -> List[str]:
+    def allowed_origins_list(self) -> list[str]:
         """Convert ALLOWED_ORIGINS string to list for CORS middleware"""
         if isinstance(self.ALLOWED_ORIGINS, str):
             if "," in self.ALLOWED_ORIGINS:

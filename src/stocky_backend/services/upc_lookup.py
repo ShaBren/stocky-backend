@@ -3,7 +3,7 @@ UPC Lookup Service - fetches product data from a remote UPC lookup service.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 import httpx
 
@@ -23,7 +23,7 @@ class UPCLookupService:
         """Check if the UPC lookup service is configured and available."""
         return bool(self.base_url)
 
-    async def fetch_product(self, upc: str) -> Optional[Dict[str, Any]]:
+    async def fetch_product(self, upc: str) -> dict[str, Any] | None:
         """Fetch product data from the remote UPC lookup service.
 
         Args:
@@ -46,9 +46,7 @@ class UPCLookupService:
                 logger.info("UPC lookup succeeded for %s", upc)
                 return data
         except httpx.TimeoutException:
-            logger.warning(
-                "UPC lookup timed out for %s (timeout=%ds)", upc, self.timeout
-            )
+            logger.warning("UPC lookup timed out for %s (timeout=%ds)", upc, self.timeout)
             return None
         except httpx.HTTPStatusError as e:
             logger.warning("UPC lookup HTTP %d for %s", e.response.status_code, upc)
@@ -57,13 +55,11 @@ class UPCLookupService:
             logger.warning("UPC lookup connection error for %s: %s", upc, e)
             return None
         except Exception as e:
-            logger.warning(
-                "UPC lookup unexpected error for %s: %s", upc, type(e).__name__
-            )
+            logger.warning("UPC lookup unexpected error for %s: %s", upc, type(e).__name__)
             return None
 
     @staticmethod
-    def extract_product_name(data: Dict[str, Any]) -> Optional[str]:
+    def extract_product_name(data: dict[str, Any]) -> str | None:
         """Extract the product name from a UPC lookup response.
 
         Tries product_name first, falls back to generic_name.

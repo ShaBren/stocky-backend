@@ -2,21 +2,20 @@
 User management endpoints
 """
 
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from ...core.security import get_current_active_user, require_admin
+from ...crud.crud import LogEntryCRUD, UserCRUD
 from ...db.database import get_db
 from ...models.models import User
-from ...core.security import get_current_active_user, require_admin
-from ...crud.crud import UserCRUD, LogEntryCRUD
-from ...schemas.schemas import UserCreate, UserUpdate, UserResponse
+from ...schemas.schemas import UserCreate, UserResponse, UserUpdate
 
 router = APIRouter()
 user_crud = UserCRUD()
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=list[UserResponse])
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -46,9 +45,7 @@ async def create_user(
     # Check if email already exists
     existing_email = user_crud.get_by_email(db, user_data.email)
     if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
     # Create user
     user = user_crud.create(db, obj_in=user_data)
@@ -82,9 +79,7 @@ async def get_user(
 
     user = user_crud.get(db, user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserResponse.model_validate(user)
 
@@ -132,9 +127,7 @@ async def update_user(
     # Update user
     db_user = user_crud.get(db, user_id)
     if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     # Compare changes BEFORE update
     changes = {}
     update_data = user_update.model_dump(exclude_unset=True)

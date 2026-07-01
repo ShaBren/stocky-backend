@@ -29,9 +29,7 @@ class TestAuthenticationAPI:
         assert data["access_token"] is not None
 
     @pytest.mark.asyncio
-    async def test_login_with_invalid_credentials(
-        self, async_client: AsyncClient, regular_user
-    ):
+    async def test_login_with_invalid_credentials(self, async_client: AsyncClient, regular_user):
         """Test login failure with invalid credentials."""
         # Given
         login_data = {"username": regular_user.username, "password": "wrong_password"}
@@ -60,9 +58,7 @@ class TestAuthenticationAPI:
         assert "detail" in data
 
     @pytest.mark.asyncio
-    async def test_login_with_inactive_user(
-        self, async_client: AsyncClient, inactive_user
-    ):
+    async def test_login_with_inactive_user(self, async_client: AsyncClient, inactive_user):
         """Test login failure with inactive user."""
         # Given
         login_data = {"username": inactive_user.username, "password": "testpassword123"}
@@ -126,9 +122,7 @@ class TestProtectedEndpoints:
         assert "email" in data
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_without_token(
-        self, async_client: AsyncClient
-    ):
+    async def test_access_protected_endpoint_without_token(self, async_client: AsyncClient):
         """Test accessing protected endpoint without token."""
         # When
         response = await async_client.get("/api/v1/auth/me")
@@ -140,9 +134,7 @@ class TestProtectedEndpoints:
         assert "Authentication required" in data["detail"]
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_with_invalid_token(
-        self, async_client: AsyncClient
-    ):
+    async def test_access_protected_endpoint_with_invalid_token(self, async_client: AsyncClient):
         """Test accessing protected endpoint with invalid token."""
         # Given
         headers = {"Authorization": "Bearer invalid_token_here"}
@@ -156,9 +148,7 @@ class TestProtectedEndpoints:
         assert "detail" in data
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_with_malformed_token(
-        self, async_client: AsyncClient
-    ):
+    async def test_access_protected_endpoint_with_malformed_token(self, async_client: AsyncClient):
         """Test accessing protected endpoint with malformed authorization header."""
         # Given
         headers = {"Authorization": "InvalidFormat token_here"}
@@ -235,9 +225,7 @@ class TestRoleBasedAccess:
         assert "Access denied" in data["detail"]
 
     @pytest.mark.asyncio
-    async def test_user_access_to_own_data(
-        self, async_client: AsyncClient, auth_headers_user
-    ):
+    async def test_user_access_to_own_data(self, async_client: AsyncClient, auth_headers_user):
         """Test user can access their own data."""
         # When
         response = await async_client.get("/api/v1/auth/me", headers=auth_headers_user)

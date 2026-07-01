@@ -45,9 +45,7 @@ class TestUserManagementWorkflow:
         # Step 3: User accesses their own data
         user_headers = {"Authorization": f"Bearer {user_token}"}
 
-        profile_response = await async_client.get(
-            "/api/v1/auth/me", headers=user_headers
-        )
+        profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
 
         assert profile_response.status_code == 200
         profile_data = profile_response.json()
@@ -67,9 +65,7 @@ class TestUserManagementWorkflow:
         assert updated_profile["email"] == "updated@example.com"
 
         # Step 5: Verify changes persist
-        final_profile_response = await async_client.get(
-            "/api/v1/auth/me", headers=user_headers
-        )
+        final_profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
 
         assert final_profile_response.status_code == 200
         final_profile = final_profile_response.json()
@@ -107,9 +103,7 @@ class TestUserManagementWorkflow:
         user_headers = {"Authorization": f"Bearer {user_token}"}
 
         # Step 3: User can access their data
-        profile_response = await async_client.get(
-            "/api/v1/auth/me", headers=user_headers
-        )
+        profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
         assert profile_response.status_code == 200
 
         # Step 4: Admin deactivates the user
@@ -124,17 +118,13 @@ class TestUserManagementWorkflow:
         assert deactivated_user["is_active"] is False
 
         # Step 5: User can no longer log in
-        new_login_response = await async_client.post(
-            "/api/v1/auth/login", data=login_data
-        )
+        new_login_response = await async_client.post("/api/v1/auth/login", data=login_data)
 
         assert new_login_response.status_code == 401
 
         # Step 6: Existing token should be invalidated (if token validation checks user status)
         # Note: This depends on implementation - some systems invalidate tokens, others don't
-        profile_response_after = await async_client.get(
-            "/api/v1/auth/me", headers=user_headers
-        )
+        profile_response_after = await async_client.get("/api/v1/auth/me", headers=user_headers)
         # This might be 401 or 403 depending on implementation
         assert profile_response_after.status_code in [401, 403]
 
@@ -164,9 +154,7 @@ class TestUserManagementWorkflow:
             created_user_ids.append(response.json()["id"])
 
         # Step 2: Admin lists all users
-        list_response = await async_client.get(
-            "/api/v1/users/", headers=auth_headers_admin
-        )
+        list_response = await async_client.get("/api/v1/users/", headers=auth_headers_admin)
 
         assert list_response.status_code == 200
         all_users = list_response.json()
@@ -239,17 +227,13 @@ class TestPermissionWorkflows:
         assert create_response.status_code == 403
 
         # Step 2: User tries to list all users (admin only)
-        list_response = await async_client.get(
-            "/api/v1/users/", headers=auth_headers_user
-        )
+        list_response = await async_client.get("/api/v1/users/", headers=auth_headers_user)
 
         assert list_response.status_code == 403
 
         # Step 3: User tries to access another user's data
         # Note: This assumes we have another user with ID 999
-        other_user_response = await async_client.get(
-            "/api/v1/users/999", headers=auth_headers_user
-        )
+        other_user_response = await async_client.get("/api/v1/users/999", headers=auth_headers_user)
 
         assert other_user_response.status_code in [403, 404]  # Forbidden or not found
 
@@ -260,9 +244,7 @@ class TestPermissionWorkflows:
         """Test that users can only modify their own data."""
 
         # Step 1: User can access their own data
-        own_data_response = await async_client.get(
-            "/api/v1/auth/me", headers=auth_headers_user
-        )
+        own_data_response = await async_client.get("/api/v1/auth/me", headers=auth_headers_user)
 
         assert own_data_response.status_code == 200
         own_data = own_data_response.json()
@@ -277,7 +259,7 @@ class TestPermissionWorkflows:
         )
 
         assert update_response.status_code == 200
-        updated_data = update_response.json()
+        update_response.json()
 
         # Step 3: User cannot update their own role (security restriction)
         role_update_data = {"role": "admin"}
@@ -289,9 +271,7 @@ class TestPermissionWorkflows:
         # This should either be forbidden or the role change should be ignored
         if role_update_response.status_code == 200:
             # If the request succeeds, verify role wasn't actually changed
-            profile_response = await async_client.get(
-                "/api/v1/auth/me", headers=auth_headers_user
-            )
+            profile_response = await async_client.get("/api/v1/auth/me", headers=auth_headers_user)
             profile_data = profile_response.json()
             assert profile_data["role"] != "ADMIN"  # Role should not have changed
         else:

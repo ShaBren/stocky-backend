@@ -3,14 +3,15 @@ Stocky Backend - Main application entry point
 """
 
 from contextlib import asynccontextmanager
+
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
-from .core.config import settings
-from .db.database import engine, Base
-from .api.routes import api_router
 from . import __version__
+from .api.routes import api_router
+from .core.config import settings
+from .db.database import Base, engine
 
 
 @asynccontextmanager

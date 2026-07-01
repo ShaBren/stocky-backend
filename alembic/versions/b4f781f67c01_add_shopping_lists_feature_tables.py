@@ -6,17 +6,17 @@ Create Date: 2025-09-27 00:40:58.372757
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b4f781f67c01"
-down_revision: Union[str, Sequence[str], None] = "7893c84217f9"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "7893c84217f9"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -47,9 +47,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_shopping_lists_id"), "shopping_lists", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_shopping_lists_id"), "shopping_lists", ["id"], unique=False)
     op.create_table(
         "shopping_list_items",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -80,9 +78,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("shopping_list_id", "item_id", name="unique_list_item"),
     )
-    op.create_index(
-        op.f("ix_shopping_list_items_id"), "shopping_list_items", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_shopping_list_items_id"), "shopping_list_items", ["id"], unique=False)
     op.create_table(
         "shopping_list_logs",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -106,9 +102,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_shopping_list_logs_id"), "shopping_list_logs", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_shopping_list_logs_id"), "shopping_list_logs", ["id"], unique=False)
     # ### end Alembic commands ###
 
 

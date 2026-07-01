@@ -2,9 +2,10 @@
 Database configuration and session management
 """
 
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from typing import Generator
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from ..core.config import settings
 

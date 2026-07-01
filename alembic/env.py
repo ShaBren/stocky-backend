@@ -1,9 +1,8 @@
-from logging.config import fileConfig
 import sys
+from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
@@ -15,7 +14,6 @@ sys.path.insert(0, str(src_path))
 # Import our application components
 from stocky_backend.core.config import settings
 from stocky_backend.db.database import Base
-import stocky_backend.models.models  # Import all models to register them
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

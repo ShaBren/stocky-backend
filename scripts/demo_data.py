@@ -9,11 +9,11 @@ Usage:
     python scripts/demo_data.py
 """
 
-import sys
 import os
-from pathlib import Path
-from datetime import datetime, timedelta
 import random
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
 
 # Add the src directory to the Python path
 current_path = Path(__file__).parent.parent
@@ -24,13 +24,13 @@ from sqlalchemy.orm import Session
 
 from stocky_backend.db.database import SessionLocal
 from stocky_backend.models.models import (
-    User,
-    Item,
-    Location,
     SKU,
     Alert,
-    UserRole,
+    Item,
+    Location,
     StorageType,
+    User,
+    UserRole,
 )
 
 
@@ -278,7 +278,7 @@ def create_sample_alerts(db: Session, admin_user: User, skus: list[SKU]) -> None
         db.add(alert)
 
     db.commit()
-    print(f"✅ Created sample alerts")
+    print("✅ Created sample alerts")
 
 
 def main():

@@ -2,23 +2,21 @@
 Item management endpoints
 """
 
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ...db.database import get_db
-from ...crud.crud import ItemCRUD, LogEntryCRUD
-from ...schemas.schemas import ItemCreate, ItemUpdate, ItemResponse
 from ...core.security import require_user_role
-from ...models.models import LogEntry
+from ...crud.crud import ItemCRUD, LogEntryCRUD
+from ...db.database import get_db
+from ...schemas.schemas import ItemCreate, ItemResponse, ItemUpdate
+from ...services.upc_background import fetch_and_update_item
 from ...services.upc_lookup import upc_lookup_service
-from ...services.upc_background import fetch_and_update_item, UNKNOWN_PRODUCT_NAME
 
 router = APIRouter()
 item_crud = ItemCRUD()
 
 
-@router.get("/", response_model=List[ItemResponse])
+@router.get("/", response_model=list[ItemResponse])
 async def list_items(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=500, description="Number of items to return"),
@@ -47,14 +45,10 @@ async def create_item(
     if item.upc:
         existing_item = item_crud.get_by_upc(db, upc=item.upc)
         if existing_item:
-            raise HTTPException(
-                status_code=400, detail=f"Item with UPC {item.upc} already exists"
-            )
+            raise HTTPException(status_code=400, detail=f"Item with UPC {item.upc} already exists")
 
     # If UPC service is available and no name was provided, use placeholder
-    should_fetch_upc = (
-        upc_lookup_service.is_available() and item.upc and not item.upc_data
-    )
+    should_fetch_upc = upc_lookup_service.is_available() and item.upc and not item.upc_data
 
     db_item = item_crud.create(
         db,
@@ -83,7 +77,7 @@ async def create_item(
     return db_item
 
 
-@router.get("/search", response_model=List[ItemResponse])
+@router.get("/search", response_model=list[ItemResponse])
 async def search_items(
     q: str = Query(..., min_length=1, description="Search query"),
     skip: int = Query(0, ge=0, description="Number of items to skip"),
@@ -168,9 +162,7 @@ async def delete_item(
     sku_crud = SKUCRUD()
     related_skus = sku_crud.get_by_item(db, item_id)
     if related_skus:
-        raise HTTPException(
-            status_code=409, detail="Cannot delete item: SKUs exist for this item."
-        )
+        raise HTTPException(status_code=409, detail="Cannot delete item: SKUs exist for this item.")
 
     item_crud.remove(db, id=item_id)
     # Log deletion
@@ -205,9 +197,7 @@ async def refresh_upc_data(
     if not item.upc:
         raise HTTPException(status_code=400, detail="Item has no UPC code")
     if not upc_lookup_service.is_available():
-        raise HTTPException(
-            status_code=503, detail="UPC lookup service is not configured"
-        )
+        raise HTTPException(status_code=503, detail="UPC lookup service is not configured")
 
     # Reset fetch flags so the background task will re-fetch
     item.uda_fetched = False

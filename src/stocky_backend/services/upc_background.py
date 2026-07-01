@@ -4,7 +4,6 @@ so scanner performance is never impacted.
 """
 
 import logging
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -65,9 +64,7 @@ async def fetch_and_update_item(upc: str, item_id: int) -> None:
         item.uda_fetch_attempted = True
 
         db.commit()
-        logger.info(
-            "Background UPC lookup: item %d updated with name=%s", item_id, product_name
-        )
+        logger.info("Background UPC lookup: item %d updated with name=%s", item_id, product_name)
 
     except Exception as e:
         db.rollback()

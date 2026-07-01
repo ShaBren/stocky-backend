@@ -2,21 +2,22 @@
 Database models for the Stocky Backend application
 """
 
+from enum import Enum
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
-    Integer,
-    String,
     DateTime,
     Float,
-    Boolean,
     ForeignKey,
+    Integer,
+    String,
     Text,
-    JSON,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from enum import Enum
 
 from ..db.database import Base
 
@@ -58,9 +59,7 @@ class User(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     created_items = relationship("Item", back_populates="created_by_user")
@@ -89,9 +88,7 @@ class Location(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     created_by_user = relationship("User", back_populates="created_locations")
@@ -122,9 +119,7 @@ class Item(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     created_by_user = relationship("User", back_populates="created_items")
@@ -150,9 +145,7 @@ class SKU(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     item = relationship("Item", back_populates="skus")
@@ -167,9 +160,7 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    alert_type = Column(
-        String(50), nullable=False
-    )  # "low_stock", "expiry_warning", "custom"
+    alert_type = Column(String(50), nullable=False)  # "low_stock", "expiry_warning", "custom"
     message = Column(Text, nullable=False)
     threshold_value = Column(Float, nullable=True)  # For low stock alerts
     is_active = Column(Boolean, default=True)
@@ -184,9 +175,7 @@ class Alert(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     sku = relationship("SKU", back_populates="alerts")
@@ -230,9 +219,7 @@ class ShoppingList(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     creator = relationship("User", back_populates="shopping_lists")
@@ -257,18 +244,14 @@ class ShoppingListItem(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     shopping_list = relationship("ShoppingList", back_populates="items")
     item = relationship("Item")
 
     # Constraints
-    __table_args__ = (
-        UniqueConstraint("shopping_list_id", "item_id", name="unique_list_item"),
-    )
+    __table_args__ = (UniqueConstraint("shopping_list_id", "item_id", name="unique_list_item"),)
 
 
 class ShoppingListLog(Base):

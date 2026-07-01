@@ -1,10 +1,11 @@
 """Unit tests for SQLAlchemy models."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.stocky_backend.models.models import User, UserRole, Item, Location
+from src.stocky_backend.models.models import Item, Location, User, UserRole
 from tests.factories.user_factory import UserFactory
 
 
@@ -33,9 +34,7 @@ class TestUserModel:
         assert user.role == UserRole.MEMBER
         assert user.is_active is True  # Default value
         assert isinstance(user.created_at, datetime)
-        assert isinstance(
-            user.updated_at, datetime
-        )  # Both timestamps are set on creation
+        assert isinstance(user.updated_at, datetime)  # Both timestamps are set on creation
 
     def test_user_creation_with_all_fields(self, db_session):
         """Test creating user with all fields populated."""
@@ -77,9 +76,7 @@ class TestUserModel:
     def test_username_uniqueness_constraint(self, db_session):
         """Test that usernames must be unique."""
         # Given
-        user1 = User(
-            username="testuser", email="user1@example.com", hashed_password="password1"
-        )
+        user1 = User(username="testuser", email="user1@example.com", hashed_password="password1")
         user2 = User(
             username="testuser",  # Same username
             email="user2@example.com",
@@ -99,9 +96,7 @@ class TestUserModel:
     def test_email_uniqueness_constraint(self, db_session):
         """Test that emails must be unique."""
         # Given
-        user1 = User(
-            username="user1", email="same@example.com", hashed_password="password1"
-        )
+        user1 = User(username="user1", email="same@example.com", hashed_password="password1")
         user2 = User(
             username="user2",
             email="same@example.com",  # Same email
@@ -156,9 +151,7 @@ class TestUserModel:
 
         # Then - Created timestamp should be set
         assert created_time is not None
-        assert isinstance(
-            user.updated_at, datetime
-        )  # Updated timestamp is also set on creation
+        assert isinstance(user.updated_at, datetime)  # Updated timestamp is also set on creation
 
         # When - Update user
         user.username = "updated_user"  # Update a field that actually exists
@@ -258,9 +251,7 @@ class TestItemModel:
     def test_item_creation_with_required_fields(self, db_session):
         """Test creating item with minimum required fields."""
         # Given
-        user = User(
-            username="testuser", email="test@example.com", hashed_password="password"
-        )
+        user = User(username="testuser", email="test@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -287,9 +278,7 @@ class TestItemModel:
     def test_item_barcode_uniqueness(self, db_session):
         """Test that item UPCs must be unique."""
         # Given
-        user = User(
-            username="testuser", email="test@example.com", hashed_password="password"
-        )
+        user = User(username="testuser", email="test@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -319,9 +308,7 @@ class TestItemModel:
     def test_item_with_optional_fields(self, db_session):
         """Test item creation with optional fields."""
         # Given
-        user = User(
-            username="testuser", email="test@example.com", hashed_password="password"
-        )
+        user = User(username="testuser", email="test@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -350,9 +337,7 @@ class TestLocationModel:
     def test_location_creation(self, db_session):
         """Test creating location with required fields."""
         # Given
-        user = User(
-            username="testuser", email="test@example.com", hashed_password="password"
-        )
+        user = User(username="testuser", email="test@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -378,9 +363,7 @@ class TestLocationModel:
     def test_location_name_uniqueness(self, db_session):
         """Test that multiple locations can have the same name (no unique constraint)."""
         # Given
-        user = User(
-            username="testuser", email="test@example.com", hashed_password="password"
-        )
+        user = User(username="testuser", email="test@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 

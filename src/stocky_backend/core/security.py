@@ -2,15 +2,13 @@
 Security dependencies for FastAPI authentication and authorization
 """
 
-from typing import Optional, List
-from fastapi import Depends, HTTPException, status, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from ..core.auth import verify_token_payload
 from ..db.database import get_db
 from ..models.models import User, UserRole
-from ..core.auth import verify_token_payload
-
 
 # Security schemes
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -19,8 +17,8 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_current_user_from_token(
     db: Session = Depends(get_db),
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
-) -> Optional[User]:
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+) -> User | None:
     """Get current user from JWT token"""
     if not credentials:
         return None
@@ -50,8 +48,8 @@ async def get_current_user_from_token(
 
 
 async def get_current_user_from_api_key(
-    db: Session = Depends(get_db), api_key: Optional[str] = Security(api_key_header)
-) -> Optional[User]:
+    db: Session = Depends(get_db), api_key: str | None = Security(api_key_header)
+) -> User | None:
     """Get current user from API key"""
     if not api_key:
         return None
@@ -65,8 +63,8 @@ async def get_current_user_from_api_key(
 
 
 async def get_current_user(
-    token_user: Optional[User] = Depends(get_current_user_from_token),
-    api_key_user: Optional[User] = Depends(get_current_user_from_api_key),
+    token_user: User | None = Depends(get_current_user_from_token),
+    api_key_user: User | None = Depends(get_current_user_from_api_key),
 ) -> User:
     """Get current user from either JWT token or API key"""
     user = token_user or api_key_user
@@ -89,14 +87,14 @@ async def get_current_active_user(
 
 
 async def get_current_user_optional(
-    token_user: Optional[User] = Depends(get_current_user_from_token),
-    api_key_user: Optional[User] = Depends(get_current_user_from_api_key),
-) -> Optional[User]:
+    token_user: User | None = Depends(get_current_user_from_token),
+    api_key_user: User | None = Depends(get_current_user_from_api_key),
+) -> User | None:
     """Get current user if authenticated, but don't require authentication"""
     return token_user or api_key_user
 
 
-def require_roles(allowed_roles: List[UserRole]):
+def require_roles(allowed_roles: list[UserRole]):
     """Dependency factory to require specific user roles"""
 
     async def role_checker(

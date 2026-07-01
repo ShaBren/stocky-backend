@@ -5,16 +5,22 @@ services:
       - "8000:8000"
     volumes:
       - stocky_data:/app/data
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=sqlite+pysqlite:///./data/stocky.db
       - SECRET_KEY=your-secret-key-change-in-production-v001
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
-      - CREATE_INITIAL_DATA=true
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - UPC_SERVICE_BASE_URL=
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   stocky_data:
-

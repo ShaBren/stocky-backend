@@ -2,11 +2,12 @@
 Pydantic schemas for API request/response models
 """
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
 
-from ..models.models import UserRole, StorageType
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from ..models.models import StorageType, UserRole
 
 
 # Base schemas
@@ -31,9 +32,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Token payload data"""
 
-    user_id: Optional[int] = None
-    username: Optional[str] = None
-    role: Optional[UserRole] = None
+    user_id: int | None = None
+    username: str | None = None
+    role: UserRole | None = None
 
 
 class LoginRequest(BaseModel):
@@ -41,9 +42,7 @@ class LoginRequest(BaseModel):
 
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
-    remember_me: bool = Field(
-        default=False, description="Enable persistent session with cookies"
-    )
+    remember_me: bool = Field(default=False, description="Enable persistent session with cookies")
 
 
 class UserCreate(BaseModel):
@@ -58,10 +57,10 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """User update request"""
 
-    username: Optional[str] = Field(None, min_length=3, max_length=50)
-    email: Optional[EmailStr] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    username: str | None = Field(None, min_length=3, max_length=50)
+    email: EmailStr | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None
 
 
 class UserResponse(BaseSchema):
@@ -81,21 +80,21 @@ class ItemCreate(BaseModel):
     """Item creation request"""
 
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
-    upc: Optional[str] = Field(None, min_length=8, max_length=20)
-    default_storage_type: Optional[StorageType] = None
-    upc_data: Optional[Dict[str, Any]] = None
+    description: str | None = Field(None, max_length=1000)
+    upc: str | None = Field(None, min_length=8, max_length=20)
+    default_storage_type: StorageType | None = None
+    upc_data: dict[str, Any] | None = None
 
 
 class ItemUpdate(BaseModel):
     """Item update request"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
-    upc: Optional[str] = Field(None, min_length=8, max_length=20)
-    default_storage_type: Optional[StorageType] = None
-    is_active: Optional[bool] = None
-    upc_data: Optional[Dict[str, Any]] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=1000)
+    upc: str | None = Field(None, min_length=8, max_length=20)
+    default_storage_type: StorageType | None = None
+    is_active: bool | None = None
+    upc_data: dict[str, Any] | None = None
 
 
 class ItemResponse(BaseSchema):
@@ -103,13 +102,13 @@ class ItemResponse(BaseSchema):
 
     id: int
     name: str
-    description: Optional[str]
-    upc: Optional[str]
-    default_storage_type: Optional[str]
+    description: str | None
+    upc: str | None
+    default_storage_type: str | None
     is_active: bool
     uda_fetched: bool
     uda_fetch_attempted: bool
-    upc_data: Optional[Dict[str, Any]] = None
+    upc_data: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -119,17 +118,17 @@ class LocationCreate(BaseModel):
     """Location creation request"""
 
     name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: str | None = Field(None, max_length=1000)
     storage_type: StorageType
 
 
 class LocationUpdate(BaseModel):
     """Location update request"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=1000)
-    storage_type: Optional[StorageType] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=1000)
+    storage_type: StorageType | None = None
+    is_active: bool | None = None
 
 
 class LocationResponse(BaseSchema):
@@ -137,7 +136,7 @@ class LocationResponse(BaseSchema):
 
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     storage_type: str
     is_active: bool
     created_at: datetime
@@ -151,20 +150,20 @@ class SKUCreate(BaseModel):
     item_id: int
     location_id: int
     quantity: float = Field(..., ge=0)
-    unit: Optional[str] = Field(None, max_length=20)
-    expiry_date: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=1000)
+    unit: str | None = Field(None, max_length=20)
+    expiry_date: datetime | None = None
+    notes: str | None = Field(None, max_length=1000)
 
 
 class SKUUpdate(BaseModel):
     """SKU update request"""
 
-    quantity: Optional[float] = Field(None, ge=0)
-    unit: Optional[str] = Field(None, max_length=20)
-    expiry_date: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=1000)
-    is_active: Optional[bool] = None
-    location_id: Optional[int] = None
+    quantity: float | None = Field(None, ge=0)
+    unit: str | None = Field(None, max_length=20)
+    expiry_date: datetime | None = None
+    notes: str | None = Field(None, max_length=1000)
+    is_active: bool | None = None
+    location_id: int | None = None
 
 
 class SKUResponse(BaseSchema):
@@ -172,9 +171,9 @@ class SKUResponse(BaseSchema):
 
     id: int
     quantity: float
-    unit: Optional[str]
-    expiry_date: Optional[datetime]
-    notes: Optional[str]
+    unit: str | None
+    expiry_date: datetime | None
+    notes: str | None
     is_active: bool
     item_id: int
     location_id: int
@@ -188,15 +187,15 @@ class AlertCreate(BaseModel):
 
     alert_type: str = Field(..., max_length=50)
     message: str = Field(..., max_length=1000)
-    threshold_value: Optional[float] = None
-    sku_id: Optional[int] = None
+    threshold_value: float | None = None
+    sku_id: int | None = None
 
 
 class AlertUpdate(BaseModel):
     """Alert update request"""
 
-    is_acknowledged: Optional[bool] = None
-    is_active: Optional[bool] = None
+    is_acknowledged: bool | None = None
+    is_active: bool | None = None
 
 
 class AlertResponse(BaseSchema):
@@ -205,11 +204,11 @@ class AlertResponse(BaseSchema):
     id: int
     alert_type: str
     message: str
-    threshold_value: Optional[float]
+    threshold_value: float | None
     is_active: bool
     is_acknowledged: bool
-    acknowledged_at: Optional[datetime]
-    sku_id: Optional[int]
+    acknowledged_at: datetime | None
+    sku_id: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -219,18 +218,18 @@ class ScanRequest(BaseModel):
     """Scanner barcode scan request"""
 
     upc: str = Field(..., min_length=8, max_length=20)
-    scanner_id: Optional[str] = None
-    location_hint: Optional[str] = None
+    scanner_id: str | None = None
+    location_hint: str | None = None
 
 
 class ScanResponse(BaseModel):
     """Scanner scan response"""
 
     success: bool
-    item: Optional[ItemResponse] = None
-    skus: List[SKUResponse] = []
+    item: ItemResponse | None = None
+    skus: list[SKUResponse] = []
     message: str
-    suggested_actions: List[str] = []
+    suggested_actions: list[str] = []
 
 
 class ScannerStatus(BaseModel):
@@ -238,7 +237,7 @@ class ScannerStatus(BaseModel):
 
     scanner_id: str
     is_associated: bool
-    associated_user: Optional[str] = None
+    associated_user: str | None = None
     last_seen: datetime
 
 
@@ -246,7 +245,7 @@ class ScannerAssociation(BaseModel):
     """Scanner association request"""
 
     scanner_id: str
-    user_id: Optional[str] = None
+    user_id: str | None = None
 
 
 class SKUQuantityUpdate(BaseModel):
@@ -260,15 +259,15 @@ class SearchRequest(BaseModel):
     """Search request"""
 
     query: str = Field(..., min_length=1)
-    item_types: Optional[List[str]] = None
-    location_filter: Optional[int] = None
+    item_types: list[str] | None = None
+    location_filter: int | None = None
     include_inactive: bool = False
 
 
 class SearchResponse(BaseModel):
     """Search response"""
 
-    items: List[ItemResponse]
+    items: list[ItemResponse]
     total_count: int
     query: str
 
@@ -279,7 +278,7 @@ class BackupResponse(BaseModel):
 
     backup_size: int
     timestamp: datetime
-    tables_included: List[str]
+    tables_included: list[str]
     message: str
 
 
@@ -287,9 +286,7 @@ class BackupImportRequest(BaseModel):
     """Request for backup import"""
 
     backup_data: str = Field(..., description="Base64 encoded gzipped SQL data")
-    force: bool = Field(
-        default=False, description="Force import even if it might cause data loss"
-    )
+    force: bool = Field(default=False, description="Force import even if it might cause data loss")
 
 
 class BackupImportResponse(BaseModel):
@@ -297,7 +294,7 @@ class BackupImportResponse(BaseModel):
 
     success: bool
     message: str
-    tables_affected: List[str]
+    tables_affected: list[str]
     records_imported: int
     timestamp: datetime
 
@@ -348,19 +345,15 @@ class ShoppingListCreate(ShoppingListBase):
 class ShoppingListUpdate(BaseModel):
     """Shopping list update request"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    is_public: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=255)
+    is_public: bool | None = None
 
 
 class ShoppingListDuplicate(BaseModel):
     """Shopping list duplication request"""
 
-    name: str = Field(
-        min_length=1, max_length=255, description="Name for duplicated list"
-    )
-    is_public: bool = Field(
-        default=False, description="Whether duplicated list should be public"
-    )
+    name: str = Field(min_length=1, max_length=255, description="Name for duplicated list")
+    is_public: bool = Field(default=False, description="Whether duplicated list should be public")
 
 
 class ShoppingListSummary(BaseSchema):
@@ -382,7 +375,7 @@ class ShoppingListResponse(BaseSchema):
     name: str
     is_public: bool
     creator: UserResponse
-    items: List[ShoppingListItemResponse]
+    items: list[ShoppingListItemResponse]
     created_at: datetime
     updated_at: datetime
 
@@ -393,14 +386,14 @@ class ShoppingListLogResponse(BaseSchema):
     id: int
     action_type: str
     user: UserResponse
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
     timestamp: datetime
 
 
 class PaginatedShoppingListsResponse(BaseModel):
     """Paginated shopping lists response"""
 
-    items: List[ShoppingListSummary]
+    items: list[ShoppingListSummary]
     total: int
     skip: int
     limit: int
@@ -409,7 +402,7 @@ class PaginatedShoppingListsResponse(BaseModel):
 class PaginatedShoppingListLogsResponse(BaseModel):
     """Paginated shopping list logs response"""
 
-    items: List[ShoppingListLogResponse]
+    items: list[ShoppingListLogResponse]
     total: int
     skip: int
     limit: int

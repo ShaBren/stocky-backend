@@ -2,39 +2,39 @@
 CRUD operations for database models
 """
 
-from typing import List, Optional, Dict, Any, Generic, TypeVar
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
-from pydantic import BaseModel
+from typing import Any, Generic, TypeVar
 
+from pydantic import BaseModel
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session
+
+from ..core.auth import hash_password
 from ..models.models import (
-    User,
-    Item,
-    Location,
     SKU,
     Alert,
+    Item,
+    Location,
     LogEntry,
     ShoppingList,
     ShoppingListItem,
     ShoppingListLog,
+    User,
 )
-from ..core.auth import hash_password
 from ..schemas.schemas import (
-    UserCreate,
-    UserUpdate,
+    AlertCreate,
+    AlertUpdate,
     ItemCreate,
     ItemUpdate,
     LocationCreate,
     LocationUpdate,
-    SKUCreate,
-    SKUUpdate,
-    AlertCreate,
-    AlertUpdate,
     ShoppingListCreate,
-    ShoppingListUpdate,
     ShoppingListDuplicate,
     ShoppingListItemCreate,
-    ShoppingListItemUpdate,
+    ShoppingListUpdate,
+    SKUCreate,
+    SKUUpdate,
+    UserCreate,
+    UserUpdate,
 )
 
 ModelType = TypeVar("ModelType")
@@ -46,12 +46,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model):
         self.model = model
 
-    def get(self, db: Session, id: int) -> Optional[ModelType]:
+    def get(self, db: Session, id: int) -> ModelType | None:
         return db.query(self.model).filter(self.model.id == id).first()
 
-    def get_multi(
-        self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[ModelType]:
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100) -> list[ModelType]:
         return db.query(self.model).offset(skip).limit(limit).all()
 
     def create(self, db: Session, *, obj_in: CreateSchemaType | dict) -> ModelType:
@@ -72,7 +70,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: Session,
         *,
         db_obj: ModelType,
-        obj_in: UpdateSchemaType | Dict[str, Any],
+        obj_in: UpdateSchemaType | dict[str, Any],
     ) -> ModelType:
         if isinstance(obj_in, dict):
             update_data = obj_in
@@ -97,10 +95,10 @@ class UserCRUD(CRUDBase[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(User)
 
-    def get_by_username(self, db: Session, username: str) -> Optional[User]:
+    def get_by_username(self, db: Session, username: str) -> User | None:
         return db.query(User).filter(User.username == username).first()
 
-    def get_by_email(self, db: Session, email: str) -> Optional[User]:
+    def get_by_email(self, db: Session, email: str) -> User | None:
         return db.query(User).filter(User.email == email).first()
 
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
@@ -118,7 +116,7 @@ class ItemCRUD(CRUDBase[Item, ItemCreate, ItemUpdate]):
     def __init__(self):
         super().__init__(Item)
 
-    def get_by_upc(self, db: Session, upc: str) -> Optional[Item]:
+    def get_by_upc(self, db: Session, upc: str) -> Item | None:
         return db.query(Item).filter(Item.upc == upc).first()
 
     def get_multi(
@@ -128,7 +126,7 @@ class ItemCRUD(CRUDBase[Item, ItemCreate, ItemUpdate]):
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
-    ) -> List[Item]:
+    ) -> list[Item]:
         query = db.query(Item)
         if not include_inactive:
             query = query.filter(Item.is_active)
@@ -140,7 +138,7 @@ class ItemCRUD(CRUDBase[Item, ItemCreate, ItemUpdate]):
         *,
         obj_in: ItemCreate,
         created_by_id: int = 1,
-        upc_data: Optional[Dict[str, Any]] = None,
+        upc_data: dict[str, Any] | None = None,
         uda_fetched: bool = False,
         uda_fetch_attempted: bool = False,
     ) -> Item:
@@ -149,18 +147,14 @@ class ItemCRUD(CRUDBase[Item, ItemCreate, ItemUpdate]):
         obj_data["is_active"] = True
         obj_data["uda_fetched"] = uda_fetched
         obj_data["uda_fetch_attempted"] = uda_fetch_attempted
-        obj_data["upc_data"] = (
-            upc_data if upc_data is not None else obj_data.get("upc_data")
-        )
+        obj_data["upc_data"] = upc_data if upc_data is not None else obj_data.get("upc_data")
         db_obj = Item(**obj_data)
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
-    def search(
-        self, db: Session, query: str, skip: int = 0, limit: int = 50
-    ) -> List[Item]:
+    def search(self, db: Session, query: str, skip: int = 0, limit: int = 50) -> list[Item]:
         search_term = f"%{query}%"
         return (
             db.query(Item)
@@ -184,7 +178,7 @@ class LocationCRUD(CRUDBase[Location, LocationCreate, LocationUpdate]):
     def __init__(self):
         super().__init__(Location)
 
-    def get_by_name(self, db: Session, name: str) -> Optional[Location]:
+    def get_by_name(self, db: Session, name: str) -> Location | None:
         return db.query(Location).filter(Location.name == name).first()
 
     def get_multi(
@@ -194,15 +188,13 @@ class LocationCRUD(CRUDBase[Location, LocationCreate, LocationUpdate]):
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
-    ) -> List[Location]:
+    ) -> list[Location]:
         query = db.query(Location)
         if not include_inactive:
             query = query.filter(Location.is_active)
         return query.offset(skip).limit(limit).all()
 
-    def create(
-        self, db: Session, *, obj_in: LocationCreate, created_by_id: int = 1
-    ) -> Location:
+    def create(self, db: Session, *, obj_in: LocationCreate, created_by_id: int = 1) -> Location:
         obj_data = obj_in.model_dump()
         obj_data["created_by"] = created_by_id
         obj_data["is_active"] = True
@@ -212,9 +204,7 @@ class LocationCRUD(CRUDBase[Location, LocationCreate, LocationUpdate]):
         db.refresh(db_obj)
         return db_obj
 
-    def search(
-        self, db: Session, query: str, skip: int = 0, limit: int = 50
-    ) -> List[Location]:
+    def search(self, db: Session, query: str, skip: int = 0, limit: int = 50) -> list[Location]:
         search_term = f"%{query}%"
         return (
             db.query(Location)
@@ -237,9 +227,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
     def __init__(self):
         super().__init__(SKU)
 
-    def get_by_item(
-        self, db: Session, item_id: int, skip: int = 0, limit: int = 100
-    ) -> List[SKU]:
+    def get_by_item(self, db: Session, item_id: int, skip: int = 0, limit: int = 100) -> list[SKU]:
         return (
             db.query(SKU)
             .filter(and_(SKU.item_id == item_id, SKU.is_active))
@@ -250,7 +238,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
 
     def get_by_location(
         self, db: Session, location_id: int, skip: int = 0, limit: int = 100
-    ) -> List[SKU]:
+    ) -> list[SKU]:
         return (
             db.query(SKU)
             .filter(and_(SKU.location_id == location_id, SKU.is_active))
@@ -259,9 +247,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
             .all()
         )
 
-    def get_by_item_location(
-        self, db: Session, item_id: int, location_id: int
-    ) -> Optional[SKU]:
+    def get_by_item_location(self, db: Session, item_id: int, location_id: int) -> SKU | None:
         return (
             db.query(SKU)
             .filter(
@@ -276,7 +262,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
 
     def get_low_stock(
         self, db: Session, skip: int = 0, limit: int = 100, threshold: float = 5.0
-    ) -> List[SKU]:
+    ) -> list[SKU]:
         return (
             db.query(SKU)
             .filter(and_(SKU.is_active, SKU.quantity <= threshold))
@@ -292,7 +278,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
-    ) -> List[SKU]:
+    ) -> list[SKU]:
         query = db.query(SKU)
         if not include_inactive:
             query = query.filter(SKU.is_active)
@@ -308,9 +294,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
         db.refresh(db_obj)
         return db_obj
 
-    def search(
-        self, db: Session, query: str, skip: int = 0, limit: int = 50
-    ) -> List[SKU]:
+    def search(self, db: Session, query: str, skip: int = 0, limit: int = 50) -> list[SKU]:
         search_term = f"%{query}%"
         return (
             db.query(SKU)
@@ -331,9 +315,7 @@ class SKUCRUD(CRUDBase[SKU, SKUCreate, SKUUpdate]):
             .all()
         )
 
-    def update_quantity(
-        self, db: Session, sku_id: int, new_quantity: int
-    ) -> Optional[SKU]:
+    def update_quantity(self, db: Session, sku_id: int, new_quantity: int) -> SKU | None:
         sku = db.query(SKU).filter(SKU.id == sku_id).first()
         if sku:
             sku.quantity = new_quantity
@@ -346,7 +328,7 @@ class AlertCRUD(CRUDBase[Alert, AlertCreate, AlertUpdate]):
     def __init__(self):
         super().__init__(Alert)
 
-    def get_active(self, db: Session, skip: int = 0, limit: int = 100) -> List[Alert]:
+    def get_active(self, db: Session, skip: int = 0, limit: int = 100) -> list[Alert]:
         return (
             db.query(Alert)
             .filter(and_(Alert.is_active, ~Alert.is_acknowledged))
@@ -362,7 +344,7 @@ class AlertCRUD(CRUDBase[Alert, AlertCreate, AlertUpdate]):
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
-    ) -> List[Alert]:
+    ) -> list[Alert]:
         query = db.query(Alert)
         if not include_inactive:
             query = query.filter(Alert.is_active)
@@ -375,7 +357,7 @@ class LogEntryCRUD(CRUDBase[LogEntry, None, None]):
 
     def get_by_user(
         self, db: Session, user_id: int, skip: int = 0, limit: int = 100
-    ) -> List[LogEntry]:
+    ) -> list[LogEntry]:
         return (
             db.query(LogEntry)
             .filter(LogEntry.user_id == user_id)
@@ -387,7 +369,7 @@ class LogEntryCRUD(CRUDBase[LogEntry, None, None]):
 
     def get_by_action(
         self, db: Session, action: str, skip: int = 0, limit: int = 100
-    ) -> List[LogEntry]:
+    ) -> list[LogEntry]:
         return (
             db.query(LogEntry)
             .filter(LogEntry.action == action)
@@ -409,7 +391,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
         skip: int = 0,
         limit: int = 100,
         include_deleted: bool = False,
-    ) -> tuple[List[ShoppingList], int]:
+    ) -> tuple[list[ShoppingList], int]:
         """Get lists accessible to user (public + own private)"""
         query = db.query(ShoppingList).filter(
             or_(ShoppingList.is_public, ShoppingList.creator_id == current_user.id)
@@ -424,7 +406,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
 
     def get_by_id_if_accessible(
         self, db: Session, list_id: int, current_user: User
-    ) -> Optional[ShoppingList]:
+    ) -> ShoppingList | None:
         """Get list if user has access (public or owner)"""
         return (
             db.query(ShoppingList)
@@ -449,9 +431,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
             return True
         return shopping_list.creator_id == current_user.id
 
-    def create(
-        self, db: Session, obj_in: ShoppingListCreate, creator: User
-    ) -> ShoppingList:
+    def create(self, db: Session, obj_in: ShoppingListCreate, creator: User) -> ShoppingList:
         """Create new shopping list with logging"""
         obj_data = obj_in.model_dump()
         obj_data["creator_id"] = creator.id
@@ -500,9 +480,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
 
         return db_obj
 
-    def remove(
-        self, db: Session, db_obj: ShoppingList, current_user: User
-    ) -> ShoppingList:
+    def remove(self, db: Session, db_obj: ShoppingList, current_user: User) -> ShoppingList:
         """Soft delete shopping list with logging"""
         db_obj.is_deleted = True
         db.commit()
@@ -650,9 +628,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
         # Log the update
         item_obj = db.query(Item).filter(Item.id == list_item.item_id).first()
         shopping_list = (
-            db.query(ShoppingList)
-            .filter(ShoppingList.id == list_item.shopping_list_id)
-            .first()
+            db.query(ShoppingList).filter(ShoppingList.id == list_item.shopping_list_id).first()
         )
 
         self.log_action(
@@ -669,16 +645,12 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
 
         return list_item
 
-    def remove_item(
-        self, db: Session, list_item: ShoppingListItem, current_user: User
-    ) -> None:
+    def remove_item(self, db: Session, list_item: ShoppingListItem, current_user: User) -> None:
         """Remove item from shopping list with logging (soft delete)"""
         # Log before deletion
         item_obj = db.query(Item).filter(Item.id == list_item.item_id).first()
         shopping_list = (
-            db.query(ShoppingList)
-            .filter(ShoppingList.id == list_item.shopping_list_id)
-            .first()
+            db.query(ShoppingList).filter(ShoppingList.id == list_item.shopping_list_id).first()
         )
 
         self.log_action(
@@ -699,7 +671,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
 
     def get_list_item(
         self, db: Session, shopping_list_id: int, item_id: int
-    ) -> Optional[ShoppingListItem]:
+    ) -> ShoppingListItem | None:
         """Get a specific item from a shopping list"""
         return (
             db.query(ShoppingListItem)
@@ -719,8 +691,8 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
         shopping_list_id: int,
         skip: int = 0,
         limit: int = 100,
-        action_type: Optional[str] = None,
-    ) -> tuple[List[ShoppingListLog], int]:
+        action_type: str | None = None,
+    ) -> tuple[list[ShoppingListLog], int]:
         """Get logs for a shopping list"""
         query = (
             db.query(ShoppingListLog)
@@ -741,7 +713,7 @@ class ShoppingListCRUD(CRUDBase[ShoppingList, ShoppingListCreate, ShoppingListUp
         shopping_list: ShoppingList,
         user: User,
         action_type: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> ShoppingListLog:
         """Log shopping list action"""
         import json

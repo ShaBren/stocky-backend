@@ -1,18 +1,17 @@
 """Unit tests for authentication functionality."""
 
-import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+import pytest
+
 from src.stocky_backend.core.auth import (
     authenticate_user,
-    get_current_user,
-    verify_token,
-)
-from src.stocky_backend.core.auth import (
     create_access_token,
+    get_current_user,
     get_password_hash,
     verify_password,
+    verify_token,
 )
 from tests.factories.user_factory import UserFactory
 
@@ -223,16 +222,10 @@ class TestTokenVerification:
         mock_jwt.decode.assert_called_once()
         mock_get_user.assert_called_once_with(db_session, id=user_id)
 
-    @patch("src.stocky_backend.core.auth.jwt")
-    def test_verify_invalid_token(self, mock_jwt, db_session):
+    def test_verify_invalid_token(self, db_session):
         """Test verification of invalid JWT token."""
-        # Given
-        from jose import JWTError
-
-        mock_jwt.decode.side_effect = JWTError("Invalid token")
-
-        # When
-        result = verify_token("invalid_token", db_session)
+        # When - pass a garbage token that PyJWT can't decode
+        result = verify_token("not.a.real.token", db_session)
 
         # Then
         assert result is None
@@ -276,9 +269,7 @@ class TestCurrentUserExtraction:
         user = UserFactory.create(id=user_id, username="testuser", is_active=True)
 
         with (
-            patch(
-                "src.stocky_backend.core.auth.verify_token_payload"
-            ) as mock_verify_payload,
+            patch("src.stocky_backend.core.auth.verify_token_payload") as mock_verify_payload,
             patch("src.stocky_backend.crud.crud.user.get") as mock_get_user,
         ):
             mock_verify_payload.return_value = {
