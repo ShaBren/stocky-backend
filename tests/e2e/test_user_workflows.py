@@ -167,12 +167,12 @@ class TestUserManagementWorkflow:
 
         assert delete_response.status_code == 200
 
-        # Step 5: Verify user is deleted
-        get_deleted_response = await async_client.get(
+        # Step 5: Verify user is deactivated (soft-delete)
+        get_deactivated_response = await async_client.get(
             f"/api/v1/users/{user_to_delete_id}", headers=auth_headers_admin
         )
-
-        assert get_deleted_response.status_code == 404
+        assert get_deactivated_response.status_code == 200
+        assert get_deactivated_response.json()["is_active"] is False
 
         # Step 6: Verify remaining users still exist
         for user_id in [created_user_ids[0], created_user_ids[2]]:

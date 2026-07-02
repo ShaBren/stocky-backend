@@ -2,6 +2,8 @@
 User management endpoints
 """
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -156,25 +158,28 @@ async def delete_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Delete (deactivate) user (admin only)"""
+    """Deactivate user (admin only). Sets is_active=False rather than hard-deleting."""
 
-    # Prevent admin from deleting themselves
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account",
+            detail="Cannot deactivate your own account",
         )
 
     user = user_crud.get(db, user_id)
-    user_crud.remove(db, id=user_id)
-    # Log deletion
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.is_active = False
+    user.updated_at = datetime.now()  # type: ignore[attr-defined]
+    db.commit()
+
     log_crud = LogEntryCRUD()
-    log_entry = {
-        "message": f"User deleted: {user.username} (ID: {user.id})",
+    log_crud.create(db, obj_in={
+        "message": f"User deactivated: {user.username} (ID: {user.id})",
         "level": "INFO",
         "module": "users",
         "function": "delete_user",
         "user_id": current_user.id,
-    }
-    log_crud.create(db, obj_in=log_entry)
+    })
     return {"message": "User deactivated successfully"}
