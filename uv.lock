@@ -1532,7 +1532,7 @@ wheels = [
 
 [[package]]
 name = "stocky-backend"
-version = "0.2.8"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

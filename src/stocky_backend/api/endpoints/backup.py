@@ -41,7 +41,7 @@ TABLE_ORDER = [
 
 def _get_all_rows(db: Session, table_name: str) -> list[dict]:
     """Get all rows from a table as a list of dicts."""
-    result = db.execute(text(f"SELECT * FROM {table_name}"))
+    result = db.execute(text(f"SELECT * FROM {table_name}"))  # noqa: S608  # table_name from SQLAlchemy inspector
     columns = list(result.keys())
     return [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
 
@@ -128,7 +128,7 @@ async def restore_backup(
         # Delete all data in reverse dependency order.
         for table in reversed(TABLE_ORDER):
             if table in data:
-                db.execute(text(f"DELETE FROM {table}"))
+                db.execute(text(f"DELETE FROM {table}"))  # noqa: S608  # table from trusted TABLE_ORDER
         db.commit()
 
     records_imported = 0
@@ -144,7 +144,7 @@ async def restore_backup(
             columns = ", ".join(row.keys())
             placeholders = ", ".join(f":{k}" for k in row)
             try:
-                db.execute(text(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"), row)
+                db.execute(text(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"), row)  # noqa: S608  # table from trusted TABLE_ORDER
                 records_imported += 1
             except Exception:
                 if mode == "merge":
@@ -175,7 +175,7 @@ async def backup_status(
     for table_name in inspector.get_table_names():
         if table_name in SKIP_TABLES:
             continue
-        result = db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+        result = db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))  # noqa: S608  # table_name from SQLAlchemy inspector
         tables[table_name] = result.scalar() or 0
 
     from ...core.config import settings
