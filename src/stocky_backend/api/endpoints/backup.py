@@ -12,7 +12,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from ...core.security import require_admin
-from ...db.database import engine, get_db
+from ...db.database import get_db
 from ...models.models import User
 from ...schemas.schemas import (
     BackupImportResponse,
@@ -59,7 +59,7 @@ async def download_backup(
     current_user: User = Depends(require_admin),
 ):
     """Download a full database backup as a gzipped JSON file. Database-agnostic."""
-    inspector = inspect(engine)
+    inspector = inspect(db.get_bind())
     all_tables = [t for t in inspector.get_table_names() if t not in SKIP_TABLES]
 
     export_data: dict[str, list[dict]] = {}
@@ -170,7 +170,7 @@ async def backup_status(
     current_user: User = Depends(require_admin),
 ):
     """Get database status — table names and row counts."""
-    inspector = inspect(engine)
+    inspector = inspect(db.get_bind())
     tables: dict[str, int] = {}
     for table_name in inspector.get_table_names():
         if table_name in SKIP_TABLES:
