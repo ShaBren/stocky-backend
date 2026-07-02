@@ -112,9 +112,7 @@ class TestProtectedEndpoints:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_logout_invalidates_session(
-        self, async_client: AsyncClient, user_token
-    ):
+    async def test_logout_invalidates_session(self, async_client: AsyncClient, user_token):
         """Test that logout invalidates the session."""
         headers = {"Cookie": f"stocky_session={user_token}"}
         response = await async_client.post("/api/v1/auth/logout", headers=headers)

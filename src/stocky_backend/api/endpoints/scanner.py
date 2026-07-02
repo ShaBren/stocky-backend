@@ -5,18 +5,17 @@ Scanner interaction endpoints with command processing support.
 import json
 from datetime import datetime, UTC
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from ...core.security import get_current_user_optional, require_user_role
 from ...crud.crud import SKUCRUD, ItemCRUD, LogEntryCRUD
 from ...db.database import get_db
-from ...models.models import LogEntry, SKU, User
+from ...models.models import SKU, User
 from ...schemas.schemas import (
     ItemCreate,
     QRCommandRequest,
     ScannerCommand,
-    ScannerState,
     ScannerStatus,
     ScanRequest,
     ScanResponse,
@@ -29,10 +28,15 @@ item_crud = ItemCRUD()
 sku_crud = SKUCRUD()
 log_crud = LogEntryCRUD()
 
-DEFAULT_SCANNER_STATE = {"current_mode": "add", "current_location_id": None, "associated_ui_id": None}
+DEFAULT_SCANNER_STATE = {
+    "current_mode": "add",
+    "current_location_id": None,
+    "associated_ui_id": None,
+}
 
 
 # ── Scanner state helpers ──────────────────────────────────────────
+
 
 def _get_scanner_state(user: User | None) -> dict:
     """Get scanner state for a user, with defaults."""
@@ -49,6 +53,7 @@ def _save_scanner_state(db: Session, user: User, state: dict) -> None:
 
 # ── Command parsing ────────────────────────────────────────────────
 
+
 def _parse_command(scanned_value: str) -> ScannerCommand | None:
     """Try to parse scanned value as a JSON command. Returns None if it's a plain UPC."""
     try:
@@ -61,6 +66,7 @@ def _parse_command(scanned_value: str) -> ScannerCommand | None:
 
 
 # ── Command handlers ───────────────────────────────────────────────
+
 
 def _handle_set_mode(user: User, payload: dict | None) -> dict:
     """Handle set_mode command."""
@@ -98,6 +104,7 @@ COMMAND_HANDLERS = {
 
 # ── Endpoints ──────────────────────────────────────────────────────
 
+
 @router.post("/scan", response_model=ScanResponse)
 async def scanner_scan(
     scan_request: ScanRequest,
@@ -125,13 +132,20 @@ async def scanner_scan(
             new_state["last_scan_timestamp"] = datetime.now(UTC).isoformat()
             _save_scanner_state(db, current_user, new_state)
 
-            mode_desc = {"add": "Add mode", "remove": "Remove mode", "move": "Move mode", "lookup": "Lookup mode"}
+            mode_desc = {
+                "add": "Add mode",
+                "remove": "Remove mode",
+                "move": "Move mode",
+                "lookup": "Lookup mode",
+            }
             return ScanResponse(
                 success=True,
                 message=f"Command accepted: {command.command} — {mode_desc.get(new_state.get('current_mode', ''), '')}",
                 mode=new_state.get("current_mode"),
                 scanner_state=new_state,
-                suggested_actions=[f"Scanner is now in '{new_state.get('current_mode', 'add')}' mode"],
+                suggested_actions=[
+                    f"Scanner is now in '{new_state.get('current_mode', 'add')}' mode"
+                ],
             )
 
     # ── UPC processing ─────────────────────────────────────────
@@ -148,27 +162,42 @@ async def scanner_scan(
         if upc_lookup_service.is_available():
             stub_create = ItemCreate(name=UNKNOWN_PRODUCT_NAME, description=None, upc=upc)
             creator_id = current_user.id if current_user else 1
-            item = item_crud.create(db, obj_in=stub_create, created_by_id=creator_id, upc_data=None, uda_fetched=False, uda_fetch_attempted=False)
+            item = item_crud.create(
+                db,
+                obj_in=stub_create,
+                created_by_id=creator_id,
+                upc_data=None,
+                uda_fetched=False,
+                uda_fetch_attempted=False,
+            )
 
             if current_user:
-                log_crud.create(db, obj_in={
-                    "level": "INFO",
-                    "message": f"Unknown UPC scanned, stub item created: {item.id} (UPC: {upc})",
-                    "module": "scanner", "function": "scanner_scan",
-                    "user_id": current_user.id,
-                    "extra_data": {"upc": upc, "scanner_id": scanner_id, "item_id": item.id},
-                })
+                log_crud.create(
+                    db,
+                    obj_in={
+                        "level": "INFO",
+                        "message": f"Unknown UPC scanned, stub item created: {item.id} (UPC: {upc})",
+                        "module": "scanner",
+                        "function": "scanner_scan",
+                        "user_id": current_user.id,
+                        "extra_data": {"upc": upc, "scanner_id": scanner_id, "item_id": item.id},
+                    },
+                )
 
             background_tasks.add_task(fetch_and_update_item, upc, item.id)
 
             return ScanResponse(
                 success=True,
                 message="New item registered, product details loading...",
-                item=item, skus=[], mode=mode,
+                item=item,
+                skus=[],
+                mode=mode,
                 scanner_state=state,
             )
         else:
-            return ScanResponse(success=False, message=f"Unknown UPC: {upc}", mode=mode, scanner_state=state)
+            return ScanResponse(
+                success=False, message=f"Unknown UPC: {upc}", mode=mode, scanner_state=state
+            )
 
     # Item found — UPC backfill if needed
     if upc_lookup_service.is_available() and not item.uda_fetched and item.upc:
@@ -180,8 +209,11 @@ async def scanner_scan(
 
     if mode == "lookup":
         return ScanResponse(
-            success=True, message=f"Found: {item.name}",
-            item=item, skus=skus, mode=mode,
+            success=True,
+            message=f"Found: {item.name}",
+            item=item,
+            skus=skus,
+            mode=mode,
             scanner_state=state,
             suggested_actions=[f"Item: {item.name} — {len(skus)} locations with stock"],
         )
@@ -189,9 +221,13 @@ async def scanner_scan(
     if not location_id:
         suggested.append("Set a location first — scan a set_location command QR")
         return ScanResponse(
-            success=True, message=f"Found: {item.name} (no location set)",
-            item=item, skus=skus, mode=mode,
-            scanner_state=state, suggested_actions=suggested,
+            success=True,
+            message=f"Found: {item.name} (no location set)",
+            item=item,
+            skus=skus,
+            mode=mode,
+            scanner_state=state,
+            suggested_actions=suggested,
         )
 
     location_id = int(location_id)
@@ -204,7 +240,9 @@ async def scanner_scan(
             suggested.append(f"Incremented {item.name} at location {location_id} (qty: {new_qty})")
         else:
             creator_id = current_user.id if current_user else 1
-            new_sku = SKU(item_id=item.id, location_id=location_id, quantity=1, created_by=creator_id)
+            new_sku = SKU(
+                item_id=item.id, location_id=location_id, quantity=1, created_by=creator_id
+            )
             db.add(new_sku)
             db.commit()
             suggested.append(f"Added {item.name} at location {location_id}")
@@ -223,13 +261,17 @@ async def scanner_scan(
         move_source_loc = state.get("move_source_location_id")
         if move_source and move_source_loc:
             # Second scan — execute the move
-            source_sku = sku_crud.get_by_item_location(db, item_id=move_source, location_id=move_source_loc)
+            source_sku = sku_crud.get_by_item_location(
+                db, item_id=move_source, location_id=move_source_loc
+            )
             if source_sku and source_sku.quantity > 0:
                 new_qty = source_sku.quantity - 1
                 sku_crud.update_quantity(db, sku_id=source_sku.id, new_quantity=new_qty)
                 # Add to destination
                 creator_id = current_user.id if current_user else 1
-                dest_sku = SKU(item_id=move_source, location_id=location_id, quantity=1, created_by=creator_id)
+                dest_sku = SKU(
+                    item_id=move_source, location_id=location_id, quantity=1, created_by=creator_id
+                )
                 db.add(dest_sku)
                 db.commit()
                 suggested.append(f"Moved 1 {item.name} to location {location_id}")
@@ -239,7 +281,7 @@ async def scanner_scan(
             # First scan — capture source
             state["move_source_item_id"] = item.id
             state["move_source_location_id"] = location_id
-            suggested.append(f"Move source set — scan destination location/item next")
+            suggested.append("Move source set — scan destination location/item next")
 
     # Save updated state
     state["last_scan_timestamp"] = datetime.now(UTC).isoformat()
@@ -250,17 +292,31 @@ async def scanner_scan(
     skus = sku_crud.get_by_item(db, item_id=item.id)
 
     if current_user:
-        log_crud.create(db, obj_in={
-            "level": "INFO",
-            "message": f"Item scanned: {item.name} (UPC: {upc}, mode: {mode})",
-            "module": "scanner", "function": "scanner_scan",
-            "user_id": current_user.id,
-            "extra_data": {"upc": upc, "item_id": item.id, "mode": mode, "scanner_id": scanner_id},
-        })
+        log_crud.create(
+            db,
+            obj_in={
+                "level": "INFO",
+                "message": f"Item scanned: {item.name} (UPC: {upc}, mode: {mode})",
+                "module": "scanner",
+                "function": "scanner_scan",
+                "user_id": current_user.id,
+                "extra_data": {
+                    "upc": upc,
+                    "item_id": item.id,
+                    "mode": mode,
+                    "scanner_id": scanner_id,
+                },
+            },
+        )
 
     return ScanResponse(
-        success=True, message=f"{item.name}", item=item, skus=skus,
-        mode=mode, scanner_state=state, suggested_actions=suggested,
+        success=True,
+        message=f"{item.name}",
+        item=item,
+        skus=skus,
+        mode=mode,
+        scanner_state=state,
+        suggested_actions=suggested,
     )
 
 
@@ -319,12 +375,16 @@ async def lookup_upc(
 
     skus = sku_crud.get_by_item(db, item_id=item.id)
 
-    log_crud.create(db, obj_in={
-        "level": "INFO",
-        "message": f"Manual UPC lookup: {item.name} (UPC: {upc})",
-        "module": "scanner", "function": "lookup_upc",
-        "user_id": current_user.id,
-        "extra_data": {"upc": upc, "item_id": item.id},
-    })
+    log_crud.create(
+        db,
+        obj_in={
+            "level": "INFO",
+            "message": f"Manual UPC lookup: {item.name} (UPC: {upc})",
+            "module": "scanner",
+            "function": "lookup_upc",
+            "user_id": current_user.id,
+            "extra_data": {"upc": upc, "item_id": item.id},
+        },
+    )
 
     return ScanResponse(success=True, message=f"Found item: {item.name}", item=item, skus=skus)

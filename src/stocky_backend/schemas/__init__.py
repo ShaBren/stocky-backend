@@ -15,8 +15,6 @@ from .schemas import (
     LocationCreate,
     LocationResponse,
     LocationUpdate,
-    LoginRequest,
-    # Scanner
     QRCommandRequest,
     ScanRequest,
     ScanResponse,

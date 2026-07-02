@@ -786,11 +786,7 @@ class SessionCRUD:
     def get_user_by_token(self, db: Session, raw_token: str) -> User | None:
         """Look up a user by raw session token. Returns None if expired or not found."""
         token_hash = self._hash_token(raw_token)
-        session = (
-            db.query(SessionModel)
-            .filter(SessionModel.token_hash == token_hash)
-            .first()
-        )
+        session = db.query(SessionModel).filter(SessionModel.token_hash == token_hash).first()
         if not session:
             return None
         # Compare with UTC, but handle SQLite's naive datetimes
@@ -807,11 +803,7 @@ class SessionCRUD:
     def delete(self, db: Session, raw_token: str) -> bool:
         """Delete a session by raw token. Returns True if found and deleted."""
         token_hash = self._hash_token(raw_token)
-        session = (
-            db.query(SessionModel)
-            .filter(SessionModel.token_hash == token_hash)
-            .first()
-        )
+        session = db.query(SessionModel).filter(SessionModel.token_hash == token_hash).first()
         if session:
             db.delete(session)
             db.commit()
@@ -820,11 +812,7 @@ class SessionCRUD:
 
     def delete_all_for_user(self, db: Session, user_id: int) -> int:
         """Delete all sessions for a user. Returns count deleted."""
-        count = (
-            db.query(SessionModel)
-            .filter(SessionModel.user_id == user_id)
-            .delete()
-        )
+        count = db.query(SessionModel).filter(SessionModel.user_id == user_id).delete()
         db.commit()
         return count
 

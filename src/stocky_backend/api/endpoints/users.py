@@ -175,11 +175,14 @@ async def delete_user(
     db.commit()
 
     log_crud = LogEntryCRUD()
-    log_crud.create(db, obj_in={
-        "message": f"User deactivated: {user.username} (ID: {user.id})",
-        "level": "INFO",
-        "module": "users",
-        "function": "delete_user",
-        "user_id": current_user.id,
-    })
+    log_crud.create(
+        db,
+        obj_in={
+            "message": f"User deactivated: {user.username} (ID: {user.id})",
+            "level": "INFO",
+            "module": "users",
+            "function": "delete_user",
+            "user_id": current_user.id,
+        },
+    )
     return {"message": "User deactivated successfully"}

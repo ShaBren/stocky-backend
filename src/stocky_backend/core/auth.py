@@ -71,6 +71,7 @@ def generate_api_key(length: int = 32) -> str:
 
 # ── Session cookie helpers ──────────────────────────────────────────
 
+
 def set_session_cookie(response: Response, token: str, persistent: bool = False) -> None:
     """Set the session cookie on the response."""
     max_age = (

@@ -14,7 +14,10 @@ from sqlalchemy.orm import Session
 from ...core.security import require_admin
 from ...db.database import engine, get_db
 from ...models.models import User
-from ...schemas.schemas import BackupExport, BackupImportResponse, BackupRestoreRequest, BackupStatusResponse
+from ...schemas.schemas import (
+    BackupImportResponse,
+    BackupStatusResponse,
+)
 
 router = APIRouter()
 
@@ -23,8 +26,15 @@ SKIP_TABLES = {"alembic_version"}
 
 # Order matters for foreign key constraints during restore
 TABLE_ORDER = [
-    "users", "items", "locations", "skus", "alerts", "log_entries",
-    "shopping_lists", "shopping_list_items", "shopping_list_logs",
+    "users",
+    "items",
+    "locations",
+    "skus",
+    "alerts",
+    "log_entries",
+    "shopping_lists",
+    "shopping_list_items",
+    "shopping_list_logs",
     "sessions",
 ]
 

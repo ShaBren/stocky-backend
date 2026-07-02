@@ -1,7 +1,5 @@
 """Unit tests for authentication functionality."""
 
-import pytest
-
 from src.stocky_backend.core.auth import (
     get_password_hash,
     verify_password,

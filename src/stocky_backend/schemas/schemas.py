@@ -220,7 +220,9 @@ class AlertResponse(BaseSchema):
 class ScanRequest(BaseModel):
     """Scanner barcode scan request — accepts UPCs or command JSON."""
 
-    upc: str = Field(..., min_length=1, max_length=500, description="Scanned value — UPC barcode or command JSON")
+    upc: str = Field(
+        ..., min_length=1, max_length=500, description="Scanned value — UPC barcode or command JSON"
+    )
     scanner_id: str | None = None
     location_hint: str | None = None
 
