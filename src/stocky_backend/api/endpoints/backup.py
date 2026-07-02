@@ -1,341 +1,177 @@
 """
-Backup and restore endpoints for database management
+Backup and restore endpoints — database-agnostic JSON export/import.
 """
 
-import base64
-import binascii
 import gzip
-import subprocess
-import tempfile
-from datetime import datetime
-from pathlib import Path
+import json
+from datetime import datetime, UTC
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
-from ...core.config import settings
 from ...core.security import require_admin
 from ...db.database import engine, get_db
 from ...models.models import User
-from ...schemas.schemas import BackupImportRequest, BackupImportResponse, BackupResponse
+from ...schemas.schemas import BackupExport, BackupImportResponse, BackupRestoreRequest, BackupStatusResponse
 
 router = APIRouter()
 
+# Tables to skip during backup (SQLite internal, Alembic)
+SKIP_TABLES = {"alembic_version"}
 
-def get_database_file_path() -> str:
-    """Extract database file path from DATABASE_URL"""
-    if "sqlite:///" in settings.DATABASE_URL:
-        return settings.DATABASE_URL.replace("sqlite:///", "")
-    else:
-        raise HTTPException(
-            status_code=500,
-            detail="Backup functionality currently only supports SQLite databases",
-        )
-
-
-def get_table_names(db: Session) -> list[str]:
-    """Get list of all table names in the database"""
-    inspector = inspect(engine)
-    return inspector.get_table_names()
+# Order matters for foreign key constraints during restore
+TABLE_ORDER = [
+    "users", "items", "locations", "skus", "alerts", "log_entries",
+    "shopping_lists", "shopping_list_items", "shopping_list_logs",
+    "sessions",
+]
 
 
-@router.post("/create/full", response_model=BackupResponse)
-async def create_full_backup(
-    db: Session = Depends(get_db), current_user: User = Depends(require_admin)
-):
-    """
-    Create a full database backup as gzipped SQL dump.
-    Admin access required.
-    """
-    try:
-        db_path = get_database_file_path()
-
-        # Get table information
-        table_names = get_table_names(db)
-
-        # Create SQL dump using sqlite3
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".sql", delete=False) as temp_file:
-            result = subprocess.run(
-                ["sqlite3", db_path, ".dump"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            temp_file.write(result.stdout)
-            temp_file.flush()
-
-            # Compress the SQL dump
-            with open(temp_file.name, "rb") as sql_file:
-                sql_data = sql_file.read()
-                compressed_data = gzip.compress(sql_data)
-
-            # Clean up temp file
-            Path(temp_file.name).unlink()
-
-        return BackupResponse(
-            backup_size=len(compressed_data),
-            timestamp=datetime.now(),
-            tables_included=table_names,
-            message=f"Full backup created successfully. Size: {len(compressed_data)} bytes (compressed)",
-        )
-
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create database backup: {e.stderr}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Backup creation failed: {str(e)}")
+def _get_all_rows(db: Session, table_name: str) -> list[dict]:
+    """Get all rows from a table as a list of dicts."""
+    result = db.execute(text(f"SELECT * FROM {table_name}"))
+    columns = list(result.keys())
+    return [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
 
 
-@router.post("/create/full/download")
-async def download_full_backup(
-    db: Session = Depends(get_db), current_user: User = Depends(require_admin)
-):
-    """
-    Create and download a full database backup as gzipped SQL file.
-    Admin access required.
-    """
-    try:
-        db_path = get_database_file_path()
-
-        # Create SQL dump using sqlite3
-        result = subprocess.run(
-            ["sqlite3", db_path, ".dump"], capture_output=True, text=True, check=True
-        )
-
-        # Compress the SQL dump
-        compressed_data = gzip.compress(result.stdout.encode("utf-8"))
-
-        # Create response with appropriate headers
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"stocky_backup_{timestamp}.sql.gz"
-
-        def generate():
-            yield compressed_data
-
-        return StreamingResponse(
-            generate(),
-            media_type="application/gzip",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
-        )
-
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create database backup: {e.stderr}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Backup creation failed: {str(e)}")
+def _serialize_value(val) -> object:
+    """Convert non-JSON-serializable values."""
+    if hasattr(val, "isoformat"):
+        return val.isoformat()
+    return val
 
 
-@router.post("/import/partial", response_model=BackupImportResponse)
-async def import_partial_backup(
-    request: BackupImportRequest,
+@router.get("/download")
+async def download_backup(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    """Download a full database backup as a gzipped JSON file. Database-agnostic."""
+    inspector = inspect(engine)
+    all_tables = [t for t in inspector.get_table_names() if t not in SKIP_TABLES]
+
+    export_data: dict[str, list[dict]] = {}
+    for table in all_tables:
+        rows = _get_all_rows(db, table)
+        export_data[table] = [{k: _serialize_value(v) for k, v in row.items()} for row in rows]
+
+    backup = {
+        "metadata": {
+            "version": "1.0",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "tables": sorted(all_tables),
+        },
+        "data": export_data,
+    }
+
+    json_bytes = json.dumps(backup, default=str).encode("utf-8")
+    compressed = gzip.compress(json_bytes)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"stocky_backup_{timestamp}.json.gz"
+
+    def generate():
+        yield compressed
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/gzip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/restore", response_model=BackupImportResponse)
+async def restore_backup(
+    file: UploadFile = File(...),
+    mode: str = Query("merge", description="merge (additive) or replace (destructive)"),
+    confirm: bool = Query(False, description="Required for replace mode"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Restore from a .json.gz backup file.
+
+    - mode=merge: INSERT rows, skip conflicts (safe, additive)
+    - mode=replace: TRUNCATE all tables then INSERT (destructive, requires confirm=true)
     """
-    Import a partial backup by applying SQL statements to existing database.
-    This will add/update data without removing existing records.
-    Admin access required.
-    """
+    if mode not in ("merge", "replace"):
+        raise HTTPException(status_code=400, detail="Mode must be 'merge' or 'replace'")
+    if mode == "replace" and not confirm:
+        raise HTTPException(status_code=400, detail="Replace mode requires confirm=true")
+
+    if not file.filename or not file.filename.endswith(".json.gz"):
+        raise HTTPException(status_code=400, detail="File must be a .json.gz backup")
+
     try:
-        # Decode and decompress the backup data
-        compressed_data = base64.b64decode(request.backup_data)
-        sql_data = gzip.decompress(compressed_data).decode("utf-8")
+        content = await file.read()
+        json_str = gzip.decompress(content).decode("utf-8")
+        backup: dict = json.loads(json_str)
+    except (gzip.BadGzipFile, json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid backup file: {e}")
 
-        # Execute SQL statements with transaction
-        records_affected = 0
-        tables_affected = set()
+    data = backup.get("data", {})
+    if not data:
+        raise HTTPException(status_code=400, detail="Backup contains no table data")
 
-        # Split SQL into individual statements and execute
-        statements = [stmt.strip() for stmt in sql_data.split(";") if stmt.strip()]
-
-        for statement in statements:
-            if statement.upper().startswith(("INSERT", "UPDATE", "CREATE TABLE", "CREATE INDEX")):
-                try:
-                    result = db.execute(text(statement))
-                    records_affected += result.rowcount if result.rowcount else 0
-
-                    # Extract table name for tracking
-                    if "INSERT INTO" in statement.upper():
-                        table_name = statement.split("INSERT INTO")[1].split()[0].strip('`"')
-                        tables_affected.add(table_name)
-                    elif "UPDATE" in statement.upper():
-                        table_name = statement.split("UPDATE")[1].split()[0].strip('`"')
-                        tables_affected.add(table_name)
-
-                except Exception as e:
-                    if not request.force:
-                        db.rollback()
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"SQL execution failed: {str(e)}. Use force=true to continue on errors.",
-                        )
-                    # Continue on error if force=true
-                    continue
-
+    if mode == "replace":
+        # Delete all data in reverse dependency order.
+        for table in reversed(TABLE_ORDER):
+            if table in data:
+                db.execute(text(f"DELETE FROM {table}"))
         db.commit()
 
-        return BackupImportResponse(
-            success=True,
-            message="Partial backup imported successfully",
-            tables_affected=list(tables_affected),
-            records_imported=records_affected,
-            timestamp=datetime.now(),
-        )
+    records_imported = 0
+    tables_affected: list[str] = []
 
-    except binascii.Error:
-        raise HTTPException(status_code=400, detail="Invalid base64 encoded backup data")
-    except gzip.BadGzipFile:
-        raise HTTPException(status_code=400, detail="Invalid gzip compressed backup data")
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Backup import failed: {str(e)}")
+    for table in TABLE_ORDER:
+        rows = data.get(table, [])
+        if not rows:
+            continue
+        tables_affected.append(table)
 
-
-@router.post("/import/full", response_model=BackupImportResponse)
-async def import_full_backup(
-    request: BackupImportRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    Import a full backup by completely replacing the current database.
-    WARNING: This will delete all existing data!
-    Admin access required.
-    """
-    if not request.force:
-        raise HTTPException(
-            status_code=400,
-            detail="Full database restore requires force=true to acknowledge data loss risk",
-        )
-
-    try:
-        # Decode and decompress the backup data
-        compressed_data = base64.b64decode(request.backup_data)
-        sql_data = gzip.decompress(compressed_data).decode("utf-8")
-
-        # Get current database info
-        db_path = get_database_file_path()
-
-        # Close current connection
-        db.close()
-
-        # Create backup of current database
-        backup_path = f"{db_path}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        subprocess.run(["cp", db_path, backup_path], check=True)
-
-        try:
-            # Write SQL to temporary file and restore
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as temp_file:
-                temp_file.write(sql_data)
-                temp_file.flush()
-
-                # Remove the existing database file completely
-                if Path(db_path).exists():
-                    Path(db_path).unlink()
-
-                # Create a new database from the SQL dump
-                subprocess.run(
-                    ["sqlite3", db_path, f".read {temp_file.name}"],
-                    check=True,
-                    input="",
-                    text=True,
-                )
-
-                # Clean up temp file
-                Path(temp_file.name).unlink()
-
-            # Reconnect to verify restore
-            from ...db.database import SessionLocal
-
-            new_db = SessionLocal()
+        for row in rows:
+            columns = ", ".join(row.keys())
+            placeholders = ", ".join(f":{k}" for k in row)
             try:
-                new_tables = get_table_names(new_db)
+                db.execute(text(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"), row)
+                records_imported += 1
+            except Exception:
+                if mode == "merge":
+                    # Skip conflicting rows in merge mode
+                    db.rollback()
+                    continue
+                raise
 
-                return BackupImportResponse(
-                    success=True,
-                    message=f"Full database restore completed. Backup of original saved to: {backup_path}",
-                    tables_affected=new_tables,
-                    records_imported=-1,  # Unknown for full restore
-                    timestamp=datetime.now(),
-                )
-            finally:
-                new_db.close()
+    db.commit()
 
-        except Exception as restore_error:
-            # Restore original database from backup
-            subprocess.run(["cp", backup_path, db_path], check=True)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Restore failed, original database restored: {str(restore_error)}",
-            )
-
-    except binascii.Error:
-        raise HTTPException(status_code=400, detail="Invalid base64 encoded backup data")
-    except gzip.BadGzipFile:
-        raise HTTPException(status_code=400, detail="Invalid gzip compressed backup data")
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Database operation failed: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Full restore failed: {str(e)}")
+    return BackupImportResponse(
+        success=True,
+        message=f"Restore complete ({mode} mode)",
+        tables_affected=tables_affected,
+        records_imported=records_imported,
+        timestamp=datetime.now(),
+    )
 
 
-@router.post("/upload/import/partial", response_model=BackupImportResponse)
-async def upload_partial_backup(
-    file: UploadFile = File(...),
-    force: bool = False,
+@router.get("/status", response_model=BackupStatusResponse)
+async def backup_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """
-    Upload and import a partial backup from a gzipped SQL file.
-    Admin access required.
-    """
-    if not file.filename.endswith(".sql.gz"):
-        raise HTTPException(status_code=400, detail="File must be a gzipped SQL file (.sql.gz)")
+    """Get database status — table names and row counts."""
+    inspector = inspect(engine)
+    tables: dict[str, int] = {}
+    for table_name in inspector.get_table_names():
+        if table_name in SKIP_TABLES:
+            continue
+        result = db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+        tables[table_name] = result.scalar() or 0
 
-    try:
-        # Read uploaded file
-        file_content = await file.read()
+    from ...core.config import settings
 
-        # Encode to base64 for processing
-        base64_data = base64.b64encode(file_content).decode("utf-8")
-
-        # Create request object and process
-        import_request = BackupImportRequest(backup_data=base64_data, force=force)
-
-        return await import_partial_backup(import_request, db, current_user)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File upload and import failed: {str(e)}")
-
-
-@router.post("/upload/import/full", response_model=BackupImportResponse)
-async def upload_full_backup(
-    file: UploadFile = File(...),
-    force: bool = False,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    Upload and import a full backup from a gzipped SQL file.
-    WARNING: This will replace the entire database!
-    Admin access required.
-    """
-    if not file.filename.endswith(".sql.gz"):
-        raise HTTPException(status_code=400, detail="File must be a gzipped SQL file (.sql.gz)")
-
-    try:
-        # Read uploaded file
-        file_content = await file.read()
-
-        # Encode to base64 for processing
-        base64_data = base64.b64encode(file_content).decode("utf-8")
-
-        # Create request object and process
-        import_request = BackupImportRequest(backup_data=base64_data, force=force)
-
-        return await import_full_backup(import_request, db, current_user)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File upload and import failed: {str(e)}")
+    return BackupStatusResponse(
+        tables=tables,
+        database_url=settings.DATABASE_URL.split("?")[0],  # strip query params for display
+        timestamp=datetime.now(),
+    )

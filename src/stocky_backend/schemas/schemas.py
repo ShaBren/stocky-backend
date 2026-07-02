@@ -294,24 +294,30 @@ class SearchResponse(BaseModel):
 
 
 # Backup schemas
-class BackupResponse(BaseModel):
-    """Response for backup creation"""
+class BackupExport(BaseModel):
+    """Full database export — JSON structure for backup files."""
 
-    backup_size: int
+    metadata: dict[str, Any]  # {version, timestamp, tables: [str]}
+    data: dict[str, list[dict[str, Any]]]  # {table_name: [row_dict, ...]}
+
+
+class BackupRestoreRequest(BaseModel):
+    """Request to restore a backup from uploaded file."""
+
+    mode: str = Field(default="merge", description="merge (additive) or replace (destructive)")
+    confirm: bool = Field(default=False, description="Must be true for replace mode")
+
+
+class BackupStatusResponse(BaseModel):
+    """Database status information."""
+
+    tables: dict[str, int]  # {table_name: row_count}
+    database_url: str
     timestamp: datetime
-    tables_included: list[str]
-    message: str
-
-
-class BackupImportRequest(BaseModel):
-    """Request for backup import"""
-
-    backup_data: str = Field(..., description="Base64 encoded gzipped SQL data")
-    force: bool = Field(default=False, description="Force import even if it might cause data loss")
 
 
 class BackupImportResponse(BaseModel):
-    """Response for backup import"""
+    """Response for backup restore."""
 
     success: bool
     message: str

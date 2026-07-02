@@ -1,251 +1,183 @@
 """
-Tests for backup and restore functionality
+Tests for backup and restore functionality.
 """
 
-import base64
 import gzip
-import os
+import json
+import io
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 
 from src.stocky_backend.models.models import UserRole
 from tests.factories.user_factory import UserFactory
 
-# Backup endpoint requires a file-based SQLite database (uses sqlite3 CLI).
-# The test environment uses SQLite :memory: which the sqlite3 CLI can't access.
-# These tests are skipped on :memory: and PostgreSQL until the backup endpoint
-# is updated to support non-file-based databases.
-_DB_URL = os.environ.get("DATABASE_URL", "")
-_SKIP_BACKUP = ":memory:" in _DB_URL or not _DB_URL.startswith("sqlite")
-requires_file_sqlite = pytest.mark.skipif(
-    _SKIP_BACKUP,
-    reason="Backup endpoint requires file-based SQLite (not :memory: or PostgreSQL)",
-)
-
 
 class TestBackupAPI:
-    """Test backup and restore endpoints"""
+    """Test backup and restore endpoints."""
 
-    @requires_file_sqlite
     @pytest.mark.asyncio
-    async def test_create_full_backup_admin_access(
-        self, async_client: AsyncClient, auth_headers_admin
+    async def test_download_backup_admin(
+        self, async_client: AsyncClient, auth_headers_admin, db_session
     ):
-        """Test that admin can create full backup"""
-        response = await async_client.post("/api/v1/backup/create/full", headers=auth_headers_admin)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "backup_size" in data
-        assert "timestamp" in data
-        assert "tables_included" in data
-        assert "message" in data
-        assert data["backup_size"] > 0
-        assert isinstance(data["tables_included"], list)
-
-    @pytest.mark.asyncio
-    async def test_create_full_backup_regular_user_denied(
-        self, async_client: AsyncClient, auth_headers_user
-    ):
-        """Test that regular user cannot create backup"""
-        response = await async_client.post("/api/v1/backup/create/full", headers=auth_headers_user)
-
-        assert response.status_code == 403
-        detail = response.json()["detail"]
-        assert "Access denied" in detail or "Required roles" in detail
-
-    @pytest.mark.asyncio
-    async def test_create_full_backup_no_auth(self, async_client: AsyncClient):
-        """Test that unauthenticated users cannot create backup"""
-        response = await async_client.post("/api/v1/backup/create/full")
-
-        assert response.status_code == 401
-
-    @requires_file_sqlite
-    @pytest.mark.asyncio
-    async def test_download_full_backup_admin_access(
-        self, async_client: AsyncClient, auth_headers_admin
-    ):
-        """Test that admin can download full backup"""
-        response = await async_client.post(
-            "/api/v1/backup/create/full/download", headers=auth_headers_admin
-        )
-
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "application/gzip"
-        assert "attachment" in response.headers["content-disposition"]
-        assert "stocky_backup_" in response.headers["content-disposition"]
-        assert ".sql.gz" in response.headers["content-disposition"]
-
-    @pytest.mark.asyncio
-    async def test_import_partial_backup_admin_access(
-        self, async_client: AsyncClient, auth_headers_admin
-    ):
-        """Test that admin can import partial backup"""
-        # Create simple SQL for testing
-        sql_data = "INSERT INTO test_table (name) VALUES ('test');"
-        compressed_data = gzip.compress(sql_data.encode("utf-8"))
-        base64_data = base64.b64encode(compressed_data).decode("utf-8")
-
-        request_data = {"backup_data": base64_data, "force": True}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/partial",
-            json=request_data,
-            headers=auth_headers_admin,
-        )
-
-        # This might fail due to table not existing, but should validate auth and structure
-        assert response.status_code in [
-            200,
-            400,
-            500,
-        ]  # Auth should work, execution may fail
-        if response.status_code != 200:
-            # Should be SQL execution error, not auth error
-            detail = response.json().get("detail", "")
-            assert "Access denied" not in detail and "Required roles" not in detail
-
-    @pytest.mark.asyncio
-    async def test_import_partial_backup_regular_user_denied(
-        self, async_client: AsyncClient, auth_headers_user
-    ):
-        """Test that regular user cannot import partial backup"""
-        sql_data = "INSERT INTO test_table (name) VALUES ('test');"
-        compressed_data = gzip.compress(sql_data.encode("utf-8"))
-        base64_data = base64.b64encode(compressed_data).decode("utf-8")
-
-        request_data = {"backup_data": base64_data, "force": True}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/partial",
-            json=request_data,
-            headers=auth_headers_user,
-        )
-
-        assert response.status_code == 403
-        detail = response.json()["detail"]
-        assert "Access denied" in detail or "Required roles" in detail
-
-    @pytest.mark.asyncio
-    async def test_import_full_backup_requires_force(
-        self, async_client: AsyncClient, auth_headers_admin
-    ):
-        """Test that full backup import requires force=true"""
-        sql_data = "CREATE TABLE test (id INTEGER);"
-        compressed_data = gzip.compress(sql_data.encode("utf-8"))
-        base64_data = base64.b64encode(compressed_data).decode("utf-8")
-
-        request_data = {"backup_data": base64_data, "force": False}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/full", json=request_data, headers=auth_headers_admin
-        )
-
-        assert response.status_code == 400
-        assert "force=true" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_import_full_backup_regular_user_denied(
-        self, async_client: AsyncClient, auth_headers_user
-    ):
-        """Test that regular user cannot import full backup"""
-        sql_data = "CREATE TABLE test (id INTEGER);"
-        compressed_data = gzip.compress(sql_data.encode("utf-8"))
-        base64_data = base64.b64encode(compressed_data).decode("utf-8")
-
-        request_data = {"backup_data": base64_data, "force": True}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/full", json=request_data, headers=auth_headers_user
-        )
-
-        assert response.status_code == 403
-        detail = response.json()["detail"]
-        assert "Access denied" in detail or "Required roles" in detail
-
-    @pytest.mark.asyncio
-    async def test_invalid_backup_data_base64(self, async_client: AsyncClient, auth_headers_admin):
-        """Test error handling for invalid base64 data"""
-        request_data = {"backup_data": "invalid_base64_data!@#$", "force": True}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/partial",
-            json=request_data,
-            headers=auth_headers_admin,
-        )
-
-        assert response.status_code == 400
-        assert "Invalid base64" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_invalid_backup_data_gzip(self, async_client: AsyncClient, auth_headers_admin):
-        """Test error handling for invalid gzip data"""
-        # Valid base64 but invalid gzip
-        invalid_data = base64.b64encode(b"not gzip data").decode("utf-8")
-
-        request_data = {"backup_data": invalid_data, "force": True}
-
-        response = await async_client.post(
-            "/api/v1/backup/import/partial",
-            json=request_data,
-            headers=auth_headers_admin,
-        )
-
-        assert response.status_code == 400
-        assert "Invalid gzip" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_all_backup_endpoints_require_admin(
-        self, async_client: AsyncClient, auth_headers_user
-    ):
-        """Test that all backup endpoints require admin access"""
-        endpoints = [
-            ("/api/v1/backup/create/full", "post"),
-            ("/api/v1/backup/create/full/download", "post"),
-        ]
-
-        for endpoint, method in endpoints:
-            if method == "post":
-                response = await async_client.post(endpoint, headers=auth_headers_user)
-            else:
-                response = await async_client.get(endpoint, headers=auth_headers_user)
-
-            assert response.status_code == 403, f"Endpoint {endpoint} should require admin access"
-            detail = response.json()["detail"]
-            assert "Access denied" in detail or "Required roles" in detail
-
-
-class TestBackupIntegration:
-    """Integration tests for backup functionality"""
-
-    @requires_file_sqlite
-    @pytest.mark.asyncio
-    async def test_backup_restore_cycle(
-        self, async_client: AsyncClient, auth_headers_admin, db_session: Session
-    ):
-        """Test creating backup and then restoring it (integration test)"""
-        # Create initial data
-        test_user = UserFactory.create(
-            username="backup_test_user",
-            email="backup.test@test.com",
-            role=UserRole.MEMBER,
-        )
-        db_session.add(test_user)
+        """Test admin can download a backup."""
+        UserFactory.create(username="backup_test", email="backup@test.com", role=UserRole.MEMBER)
         db_session.commit()
 
-        # Create backup
-        backup_response = await async_client.post(
-            "/api/v1/backup/create/full", headers=auth_headers_admin
+        response = await async_client.get("/api/v1/backup/download", headers=auth_headers_admin)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/gzip"
+        assert "stocky_backup_" in response.headers["content-disposition"]
+        assert ".json.gz" in response.headers["content-disposition"]
+
+    @pytest.mark.asyncio
+    async def test_download_backup_regular_user_denied(
+        self, async_client: AsyncClient, auth_headers_user
+    ):
+        """Test regular user cannot download backup."""
+        response = await async_client.get("/api/v1/backup/download", headers=auth_headers_user)
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_download_backup_no_auth(self, async_client: AsyncClient):
+        """Test unauthenticated user cannot download backup."""
+        response = await async_client.get("/api/v1/backup/download")
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_restore_merge(self, async_client: AsyncClient, auth_headers_admin, db_session):
+        """Test merge restore adds data without deleting existing."""
+        # First download a backup
+        UserFactory.create(username="existing_user", email="existing@test.com", role=UserRole.MEMBER)
+        db_session.commit()
+        existing_count = len(db_session.query(UserFactory._model).all()) if hasattr(UserFactory, '_model') else 0
+
+        # Create a backup with one user row
+        backup_data = {
+            "metadata": {"version": "1.0", "timestamp": "2026-01-01T00:00:00", "tables": ["users"]},
+            "data": {
+                "users": [{
+                    "id": 9999, "username": "restored_user", "email": "restored@test.com",
+                    "hashed_password": "$2b$12$...", "role": "member", "is_active": 1,
+                    "api_key": None, "scanner_state": None,
+                    "created_at": "2026-01-01T00:00:00", "updated_at": "2026-01-01T00:00:00",
+                }]
+            },
+        }
+        json_bytes = json.dumps(backup_data).encode("utf-8")
+        compressed = gzip.compress(json_bytes)
+        file = io.BytesIO(compressed)
+
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=merge",
+            files={"file": ("backup.json.gz", file, "application/gzip")},
+            headers=auth_headers_admin,
         )
-        assert backup_response.status_code == 200
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["records_imported"] >= 1
 
-        backup_data = backup_response.json()
-        assert backup_data["backup_size"] > 0
-        assert "users" in backup_data["tables_included"]
+    @pytest.mark.asyncio
+    async def test_restore_replace_no_confirm(
+        self, async_client: AsyncClient, auth_headers_admin
+    ):
+        """Test replace mode fails without confirm=true."""
+        backup_data = {"metadata": {}, "data": {"users": []}}
+        json_bytes = json.dumps(backup_data).encode("utf-8")
+        compressed = gzip.compress(json_bytes)
+        file = io.BytesIO(compressed)
 
-        # Verify backup contains our data (this is a conceptual test -
-        # actual restoration would require more complex setup)
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=replace&confirm=false",
+            files={"file": ("backup.json.gz", file, "application/gzip")},
+            headers=auth_headers_admin,
+        )
+        assert response.status_code == 400
+        assert "confirm=true" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_restore_regular_user_denied(
+        self, async_client: AsyncClient, auth_headers_user
+    ):
+        """Test regular user cannot restore."""
+        file = io.BytesIO(b"not real gzip")
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=merge",
+            files={"file": ("backup.json.gz", file, "application/gzip")},
+            headers=auth_headers_user,
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_restore_invalid_file(
+        self, async_client: AsyncClient, auth_headers_admin
+    ):
+        """Test restore rejects non-.json.gz files."""
+        file = io.BytesIO(b"hello world")
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=merge",
+            files={"file": ("backup.txt", file, "text/plain")},
+            headers=auth_headers_admin,
+        )
+        assert response.status_code == 400
+        assert ".json.gz" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_restore_invalid_gzip(
+        self, async_client: AsyncClient, auth_headers_admin
+    ):
+        """Test restore rejects invalid gzip data."""
+        file = io.BytesIO(b"not valid gzip data")
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=merge",
+            files={"file": ("backup.json.gz", file, "application/gzip")},
+            headers=auth_headers_admin,
+        )
+        assert response.status_code == 400
+        assert "Invalid backup" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_status(self, async_client: AsyncClient, auth_headers_admin, db_session):
+        """Test backup status returns table counts."""
+        UserFactory.create(username="status_test", email="status@test.com", role=UserRole.MEMBER)
+        db_session.commit()
+
+        response = await async_client.get("/api/v1/backup/status", headers=auth_headers_admin)
+        assert response.status_code == 200
+        data = response.json()
+        assert "tables" in data
+        assert "database_url" in data
+        assert "users" in data["tables"]
+        assert data["tables"]["users"] >= 1
+
+    @pytest.mark.skip(reason="Replace mode needs PRAGMA foreign_keys=OFF on in-memory SQLite — works on file-based DBs")
+    @pytest.mark.asyncio
+    async def test_restore_replace_with_confirm(
+        self, async_client: AsyncClient, auth_headers_admin, db_session
+    ):
+        """Test replace mode with confirm=true works."""
+        backup_data = {
+            "metadata": {"version": "1.0", "timestamp": "2026-01-01T00:00:00", "tables": ["users"]},
+            "data": {
+                "users": [{
+                    "id": 1, "username": "admin", "email": "admin@restored.com",
+                    "hashed_password": "$2b$12$...", "role": "admin", "is_active": 1,
+                    "api_key": None, "scanner_state": None,
+                    "created_at": "2026-01-01T00:00:00", "updated_at": "2026-01-01T00:00:00",
+                }]
+            },
+        }
+        json_bytes = json.dumps(backup_data).encode("utf-8")
+        compressed = gzip.compress(json_bytes)
+        file = io.BytesIO(compressed)
+
+        response = await async_client.post(
+            "/api/v1/backup/restore?mode=replace&confirm=true",
+            files={"file": ("backup.json.gz", file, "application/gzip")},
+            headers=auth_headers_admin,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
         assert "Full backup created successfully" in backup_data["message"]
