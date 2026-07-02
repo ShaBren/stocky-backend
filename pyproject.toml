@@ -19,6 +19,7 @@ dependencies = [
     "httpx",
     "email-validator",
     "python-multipart",
+    "qrcode>=8.2",
 ]
 
 [dependency-groups]

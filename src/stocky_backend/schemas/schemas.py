@@ -218,9 +218,9 @@ class AlertResponse(BaseSchema):
 
 # Scanner schemas
 class ScanRequest(BaseModel):
-    """Scanner barcode scan request"""
+    """Scanner barcode scan request — accepts UPCs or command JSON."""
 
-    upc: str = Field(..., min_length=8, max_length=20)
+    upc: str = Field(..., min_length=1, max_length=500, description="Scanned value — UPC barcode or command JSON")
     scanner_id: str | None = None
     location_hint: str | None = None
 
@@ -233,6 +233,31 @@ class ScanResponse(BaseModel):
     skus: list[SKUResponse] = []
     message: str
     suggested_actions: list[str] = []
+    mode: str | None = None
+    scanner_state: dict[str, Any] | None = None
+
+
+class ScannerCommand(BaseModel):
+    """Parsed scanner command from a command barcode."""
+
+    command: str
+    payload: dict[str, Any] | None = None
+
+
+class QRCommandRequest(BaseModel):
+    """Request to generate a command QR code."""
+
+    command: str
+    payload: dict[str, Any] | None = None
+
+
+class ScannerState(BaseModel):
+    """Scanner state stored in the user's scanner_state JSON column."""
+
+    current_mode: str = "add"
+    current_location_id: int | None = None
+    associated_ui_id: str | None = None
+    last_scan_timestamp: str | None = None
 
 
 class ScannerStatus(BaseModel):
@@ -242,13 +267,6 @@ class ScannerStatus(BaseModel):
     is_associated: bool
     associated_user: str | None = None
     last_seen: datetime
-
-
-class ScannerAssociation(BaseModel):
-    """Scanner association request"""
-
-    scanner_id: str
-    user_id: str | None = None
 
 
 class SKUQuantityUpdate(BaseModel):

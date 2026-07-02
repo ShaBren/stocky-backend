@@ -17,8 +17,12 @@ from .schemas import (
     LocationUpdate,
     LoginRequest,
     # Scanner
+    QRCommandRequest,
     ScanRequest,
     ScanResponse,
+    ScannerCommand,
+    ScannerState,
+    ScannerStatus,
     # Search
     SearchRequest,
     SearchResponse,
@@ -66,6 +70,10 @@ __all__ = [
     # Scanner
     "ScanRequest",
     "ScanResponse",
+    "ScannerCommand",
+    "ScannerState",
+    "ScannerStatus",
+    "QRCommandRequest",
     # Search
     "SearchRequest",
     "SearchResponse",
