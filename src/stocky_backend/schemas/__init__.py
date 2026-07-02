@@ -27,8 +27,10 @@ from .schemas import (
     SKUResponse,
     SKUUpdate,
     # Authentication
+    LoginRequest,
+    PasswordChange,
+    SessionResponse,
     Token,
-    TokenData,
     # Users
     UserCreate,
     UserResponse,
@@ -38,8 +40,9 @@ from .schemas import (
 __all__ = [
     # Authentication
     "Token",
-    "TokenData",
     "LoginRequest",
+    "SessionResponse",
+    "PasswordChange",
     # Users
     "UserCreate",
     "UserUpdate",

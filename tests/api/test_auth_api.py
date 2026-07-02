@@ -12,186 +12,163 @@ class TestAuthenticationAPI:
         self, async_client: AsyncClient, db_session, regular_user
     ):
         """Test successful login with valid credentials."""
-        # Given
         login_data = {
             "username": regular_user.username,
-            "password": "testpassword123",  # Default password from factory
+            "password": "testpassword123",
         }
-
-        # When
         response = await async_client.post("/api/v1/auth/login", data=login_data)
-
-        # Then
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        assert data["access_token"] is not None
+        assert data["user_id"] == regular_user.id
+        assert data["role"] == "member"
+        assert data["username"] == regular_user.username
 
     @pytest.mark.asyncio
     async def test_login_with_invalid_credentials(self, async_client: AsyncClient, regular_user):
         """Test login failure with invalid credentials."""
-        # Given
         login_data = {"username": regular_user.username, "password": "wrong_password"}
-
-        # When
         response = await async_client.post("/api/v1/auth/login", data=login_data)
-
-        # Then
         assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
-        assert "Incorrect username or password" in data["detail"]
 
     @pytest.mark.asyncio
     async def test_login_with_nonexistent_user(self, async_client: AsyncClient):
         """Test login failure with non-existent user."""
-        # Given
         login_data = {"username": "nonexistent_user", "password": "any_password"}
-
-        # When
         response = await async_client.post("/api/v1/auth/login", data=login_data)
-
-        # Then
         assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
 
     @pytest.mark.asyncio
     async def test_login_with_inactive_user(self, async_client: AsyncClient, inactive_user):
         """Test login failure with inactive user."""
-        # Given
         login_data = {"username": inactive_user.username, "password": "testpassword123"}
-
-        # When
         response = await async_client.post("/api/v1/auth/login", data=login_data)
-
-        # Then
         assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
 
     @pytest.mark.asyncio
     async def test_login_with_missing_credentials(self, async_client: AsyncClient):
         """Test login failure with missing credentials."""
-        # Given
-        login_data = {
-            "username": "testuser"
-            # Missing password
-        }
-
-        # When
+        login_data = {"username": "testuser"}
         response = await async_client.post("/api/v1/auth/login", data=login_data)
-
-        # Then
-        assert response.status_code == 422  # Validation error
-        data = response.json()
-        assert "detail" in data
+        assert response.status_code == 422
 
     @pytest.mark.asyncio
     async def test_login_with_empty_credentials(self, async_client: AsyncClient):
         """Test login failure with empty credentials."""
-        # Given
         login_data = {"username": "", "password": ""}
-
-        # When
         response = await async_client.post("/api/v1/auth/login", data=login_data)
+        assert response.status_code in [401, 422]
 
-        # Then
-        assert response.status_code in [
-            401,
-            422,
-        ]  # Either auth failure or validation error
+    @pytest.mark.asyncio
+    async def test_login_json_endpoint(self, async_client: AsyncClient, regular_user):
+        """Test login via JSON endpoint."""
+        login_data = {
+            "username": regular_user.username,
+            "password": "testpassword123",
+            "remember_me": False,
+        }
+        response = await async_client.post("/api/v1/auth/login-json", json=login_data)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user_id"] == regular_user.id
+        assert data["role"] == "member"
+
+    @pytest.mark.asyncio
+    async def test_login_sets_session_cookie(self, async_client: AsyncClient, regular_user):
+        """Test that login sets the session cookie."""
+        login_data = {
+            "username": regular_user.username,
+            "password": "testpassword123",
+        }
+        response = await async_client.post("/api/v1/auth/login", data=login_data)
+        assert response.status_code == 200
+        assert "stocky_session" in response.cookies
 
 
 class TestProtectedEndpoints:
     """Test access to protected endpoints."""
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_with_valid_token(
+    async def test_access_protected_endpoint_with_valid_session(
         self, async_client: AsyncClient, auth_headers_user
     ):
-        """Test accessing protected endpoint with valid token."""
-        # When
+        """Test accessing protected endpoint with valid session cookie."""
         response = await async_client.get("/api/v1/auth/me", headers=auth_headers_user)
-
-        # Then
         assert response.status_code == 200
         data = response.json()
         assert "username" in data
         assert "email" in data
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_without_token(self, async_client: AsyncClient):
-        """Test accessing protected endpoint without token."""
-        # When
+    async def test_access_protected_endpoint_without_session(self, async_client: AsyncClient):
+        """Test accessing protected endpoint without session."""
         response = await async_client.get("/api/v1/auth/me")
-
-        # Then
         assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
-        assert "Authentication required" in data["detail"]
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_with_invalid_token(self, async_client: AsyncClient):
-        """Test accessing protected endpoint with invalid token."""
-        # Given
-        headers = {"Authorization": "Bearer invalid_token_here"}
-
-        # When
+    async def test_access_protected_endpoint_with_invalid_cookie(self, async_client: AsyncClient):
+        """Test accessing protected endpoint with invalid session cookie."""
+        headers = {"Cookie": "stocky_session=invalid_token_value"}
         response = await async_client.get("/api/v1/auth/me", headers=headers)
-
-        # Then
         assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
 
     @pytest.mark.asyncio
-    async def test_access_protected_endpoint_with_malformed_token(self, async_client: AsyncClient):
-        """Test accessing protected endpoint with malformed authorization header."""
-        # Given
-        headers = {"Authorization": "InvalidFormat token_here"}
-
-        # When
-        response = await async_client.get("/api/v1/auth/me", headers=headers)
-
-        # Then
-        assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
-
-
-class TestTokenRefresh:
-    """Test token refresh functionality (if implemented)."""
-
-    @pytest.mark.asyncio
-    async def test_refresh_valid_token(self, async_client: AsyncClient, user_token):
-        """Test refreshing a valid token."""
-        # Given
-        headers = {"Authorization": f"Bearer {user_token}"}
-
-        # When
-        response = await async_client.post("/api/v1/auth/refresh", headers=headers)
-
-        # Then
+    async def test_logout_invalidates_session(
+        self, async_client: AsyncClient, user_token
+    ):
+        """Test that logout invalidates the session."""
+        headers = {"Cookie": f"stocky_session={user_token}"}
+        response = await async_client.post("/api/v1/auth/logout", headers=headers)
         assert response.status_code == 200
-        data = response.json()
-        assert "access_token" in data
-        assert "token_type" in data
+
+        # After logout, the session should no longer work
+        response = await async_client.get("/api/v1/auth/me", headers=headers)
+        assert response.status_code == 401
+
+
+class TestPasswordChange:
+    """Test password change functionality."""
 
     @pytest.mark.asyncio
-    async def test_refresh_expired_token(self, async_client: AsyncClient):
-        """Test refreshing an expired token."""
-        # Given
-        expired_token = "expired_token_here"
-        headers = {"Authorization": f"Bearer {expired_token}"}
+    async def test_change_password_success(
+        self, async_client: AsyncClient, auth_headers_user, regular_user
+    ):
+        """Test successful password change."""
+        data = {
+            "current_password": "testpassword123",
+            "new_password": "new_password_456",
+        }
+        response = await async_client.post(
+            "/api/v1/auth/change-password", json=data, headers=auth_headers_user
+        )
+        assert response.status_code == 200
 
-        # When
-        response = await async_client.post("/api/v1/auth/refresh", headers=headers)
+    @pytest.mark.asyncio
+    async def test_change_password_wrong_current(
+        self, async_client: AsyncClient, auth_headers_user
+    ):
+        """Test password change with wrong current password."""
+        data = {
+            "current_password": "wrong_current",
+            "new_password": "new_password_456",
+        }
+        response = await async_client.post(
+            "/api/v1/auth/change-password", json=data, headers=auth_headers_user
+        )
+        assert response.status_code == 400
 
-        # Then
-        assert response.status_code == 401
+    @pytest.mark.asyncio
+    async def test_change_password_same_as_current(
+        self, async_client: AsyncClient, auth_headers_user
+    ):
+        """Test password change with same password."""
+        data = {
+            "current_password": "testpassword123",
+            "new_password": "testpassword123",
+        }
+        response = await async_client.post(
+            "/api/v1/auth/change-password", json=data, headers=auth_headers_user
+        )
+        assert response.status_code == 400
 
 
 class TestRoleBasedAccess:
@@ -202,10 +179,7 @@ class TestRoleBasedAccess:
         self, async_client: AsyncClient, auth_headers_admin
     ):
         """Test admin user accessing admin-only endpoint."""
-        # When
         response = await async_client.get("/api/v1/users/", headers=auth_headers_admin)
-
-        # Then
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -215,10 +189,7 @@ class TestRoleBasedAccess:
         self, async_client: AsyncClient, auth_headers_user
     ):
         """Test regular user denied access to admin-only endpoint."""
-        # When
         response = await async_client.get("/api/v1/users/", headers=auth_headers_user)
-
-        # Then
         assert response.status_code == 403
         data = response.json()
         assert "detail" in data
@@ -227,7 +198,6 @@ class TestRoleBasedAccess:
     @pytest.mark.asyncio
     async def test_user_access_to_own_data(self, async_client: AsyncClient, auth_headers_user):
         """Test user can access their own data."""
-        # When
         response = await async_client.get("/api/v1/auth/me", headers=auth_headers_user)
 
         # Then

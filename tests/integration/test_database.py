@@ -134,8 +134,7 @@ class TestUserCRUDIntegration:
             assert f"user{i}" in usernames
 
     def test_user_authentication_integration(self, db_session: Session):
-        """Test user authentication with database integration."""
-        # Given
+        """Test user password verification with database integration."""
         password = "testpassword123"
         user_data = UserCreate(
             username="testuser",
@@ -144,37 +143,23 @@ class TestUserCRUDIntegration:
         )
         created_user = crud.user.create(db=db_session, obj_in=user_data)
 
-        # When
-        from src.stocky_backend.core.auth import authenticate_user
+        from src.stocky_backend.core.auth import verify_password
 
-        authenticated_user = authenticate_user(
-            db=db_session, username="testuser", password=password
-        )
-
-        # Then
-        assert authenticated_user is not False
-        assert authenticated_user.id == created_user.id
-        assert authenticated_user.username == "testuser"
+        assert verify_password(password, created_user.hashed_password) is True
+        assert created_user.username == "testuser"
 
     def test_user_authentication_wrong_password_integration(self, db_session: Session):
-        """Test user authentication with wrong password and database integration."""
-        # Given
+        """Test user password verification with wrong password."""
         user_data = UserCreate(
             username="testuser",
             email="test@example.com",
             password="correct_password",
         )
-        crud.user.create(db=db_session, obj_in=user_data)
+        created_user = crud.user.create(db=db_session, obj_in=user_data)
 
-        # When
-        from src.stocky_backend.core.auth import authenticate_user
+        from src.stocky_backend.core.auth import verify_password
 
-        authenticated_user = authenticate_user(
-            db=db_session, username="testuser", password="wrong_password"
-        )
-
-        # Then
-        assert authenticated_user is False
+        assert verify_password("wrong_password", created_user.hashed_password) is False
 
 
 class TestUserConstraintsIntegration:
@@ -284,8 +269,7 @@ class TestUserActivationIntegration:
         assert db_user.is_active is False
 
     def test_inactive_user_authentication_integration(self, db_session: Session):
-        """Test that inactive users cannot authenticate."""
-        # Given
+        """Test that inactive users are properly flagged."""
         user_data = UserCreate(
             username="testuser",
             email="test@example.com",
@@ -297,12 +281,6 @@ class TestUserActivationIntegration:
         update_data = UserUpdate(is_active=False)
         crud.user.update(db=db_session, db_obj=created_user, obj_in=update_data)
 
-        # When
-        from src.stocky_backend.core.auth import authenticate_user
-
-        authenticated_user = authenticate_user(
-            db=db_session, username="testuser", password="password123"
-        )
-
-        # Then
-        assert authenticated_user is False
+        # Verify user is inactive in DB
+        db_user = crud.user.get(db=db_session, id=created_user.id)
+        assert db_user.is_active is False

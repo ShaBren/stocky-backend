@@ -17,7 +17,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from src.stocky_backend.core.auth import create_access_token
+from src.stocky_backend.core.config import settings
+from src.stocky_backend.crud.crud import session as session_crud
 from src.stocky_backend.db.database import Base, get_db
 from src.stocky_backend.main import app
 from src.stocky_backend.models.models import User, UserRole
@@ -183,27 +184,39 @@ def inactive_user(db_session) -> User:
 
 
 @pytest.fixture
-def admin_token(admin_user) -> str:
-    """Generate JWT token for admin user."""
-    return create_access_token(data={"sub": str(admin_user.id)})
+def admin_token(admin_user, db_session) -> str:
+    """Create a session for the admin user and return the raw token."""
+    return session_crud.create(db_session, user_id=admin_user.id, is_persistent=False)
 
 
 @pytest.fixture
-def user_token(regular_user) -> str:
-    """Generate JWT token for regular user."""
-    return create_access_token(data={"sub": str(regular_user.id)})
+def user_token(regular_user, db_session) -> str:
+    """Create a session for the regular user and return the raw token."""
+    return session_crud.create(db_session, user_id=regular_user.id, is_persistent=False)
 
 
 @pytest.fixture
 def auth_headers_admin(admin_token) -> dict:
-    """Provide authorization headers for admin user."""
-    return {"Authorization": f"Bearer {admin_token}"}
+    """Provide session cookie for admin user."""
+    return {"Cookie": f"{settings.COOKIE_NAME}={admin_token}"}
 
 
 @pytest.fixture
 def auth_headers_user(user_token) -> dict:
-    """Provide authorization headers for regular user."""
-    return {"Authorization": f"Bearer {user_token}"}
+    """Provide session cookie for regular user."""
+    return {"Cookie": f"{settings.COOKIE_NAME}={user_token}"}
+
+
+@pytest.fixture
+def admin_cookies(admin_token) -> dict:
+    """Provide session cookies dict for admin user (for httpx cookies param)."""
+    return {settings.COOKIE_NAME: admin_token}
+
+
+@pytest.fixture
+def user_cookies(user_token) -> dict:
+    """Provide session cookies dict for regular user (for httpx cookies param)."""
+    return {settings.COOKIE_NAME: user_token}
 
 
 # ============================================================================

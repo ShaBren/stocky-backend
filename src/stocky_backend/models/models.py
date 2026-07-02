@@ -2,6 +2,7 @@
 Database models for the Stocky Backend application
 """
 
+import uuid
 from enum import Enum
 
 from sqlalchemy import (
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -67,6 +69,7 @@ class User(Base):
     created_skus = relationship("SKU", back_populates="created_by_user")
     created_alerts = relationship("Alert", back_populates="created_by_user")
     shopping_lists = relationship("ShoppingList", back_populates="creator")
+    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
 
     def __str__(self):
         return f"<User {self.username}>"
@@ -273,3 +276,24 @@ class ShoppingListLog(Base):
     # Relationships
     shopping_list = relationship("ShoppingList", back_populates="logs")
     user = relationship("User")
+
+
+class Session(Base):
+    """Session model for session-based authentication.
+
+    Stores a SHA-256 hash of the session token (never the raw token).
+    The raw token is sent to the client as an httpOnly cookie and
+    never stored on the server in plaintext.
+    """
+
+    __tablename__ = "sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_persistent = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="sessions")

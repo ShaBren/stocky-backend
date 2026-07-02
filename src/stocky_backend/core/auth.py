@@ -1,21 +1,13 @@
 """
-Authentication utilities for JWT tokens and password hashing
+Authentication utilities for session-based auth and password hashing.
 """
 
 import secrets
 import string
-from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Optional, Union
 
-import jwt
-from fastapi import HTTPException, Request, Response, status
-from sqlalchemy.orm import Session
+from fastapi import Request, Response
 
 from ..core.config import settings
-
-if TYPE_CHECKING:
-    from ..models.models import User, UserRole
-
 
 # Password hashing context
 # Use direct bcrypt to avoid passlib compatibility issues with Python 3.13
@@ -77,178 +69,18 @@ def generate_api_key(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
-    """Create a JWT access token"""
-    to_encode = data.copy()
+# ── Session cookie helpers ──────────────────────────────────────────
 
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    to_encode.update({"exp": expire})
-
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
-
-
-def verify_token_payload(token: str) -> dict[str, Any]:
-    """Verify and decode a JWT token"""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-
-def create_token_response(user_id: int, username: str, role: "UserRole") -> dict[str, Any]:
-    """Create a complete token response"""
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    refresh_token_expires = timedelta(days=7)
-
-    token_data = {
-        "sub": str(user_id),
-        "username": username,
-        "role": role,
-    }
-
-    access_token = create_access_token(data=token_data, expires_delta=access_token_expires)
-
-    refresh_token = create_access_token(
-        data={"sub": str(user_id), "type": "refresh"},
-        expires_delta=refresh_token_expires,
+def set_session_cookie(response: Response, token: str, persistent: bool = False) -> None:
+    """Set the session cookie on the response."""
+    max_age = (
+        settings.PERSISTENT_SESSION_EXPIRE_DAYS * 86400
+        if persistent
+        else settings.SESSION_EXPIRE_HOURS * 3600
     )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
-        "user_id": user_id,
-        "role": role,
-        "refresh_token": refresh_token,
-    }
-
-
-def authenticate_user(db: Session, username: str, password: str) -> Union[bool, "User"]:
-    """Authenticate a user with username and password."""
-    from ..crud import crud
-
-    user = crud.user.get_by_username(db, username=username)
-    if not user:
-        return False
-    if not user.is_active:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
-    return user
-
-
-async def get_current_user(db: Session, token: str) -> "User":
-    """Get current user from JWT token."""
-    from ..crud import crud
-
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = verify_token_payload(token)
-
-        # Try to get user by ID first (preferred method)
-        user_id = payload.get("sub")
-        if user_id:
-            try:
-                user = crud.user.get(db, id=int(user_id))
-                if user:
-                    if not user.is_active:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Inactive user",
-                        )
-                    return user
-            except (ValueError, TypeError):
-                pass
-
-        # Fall back to username lookup
-        username: str = payload.get("username")
-        if username:
-            user = crud.user.get_by_username(db, username=username)
-            if user:
-                if not user.is_active:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
-                    )
-                return user
-
-        raise credentials_exception
-
-    except jwt.PyJWTError:
-        raise credentials_exception
-
-
-def verify_token_simple(token: str) -> dict[str, Any] | None:
-    """Verify JWT token and return payload, or None if invalid."""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except jwt.PyJWTError:
-        return None
-
-
-# Create an alias for the tests that expect this name
-def verify_token(token: str, db: Session = None) -> Optional["User"]:
-    """Verify token and return user (for test compatibility)."""
-    if db is None:
-        # If no db session provided, just verify token
-        payload = verify_token_simple(token)
-        return payload
-
-    # With db session, return actual user
-    from ..crud import crud
-
-    payload = verify_token_simple(token)
-    if not payload:
-        return None
-
-    # Try to get user by ID first (preferred method)
-    user_id = payload.get("sub")
-    if user_id:
-        try:
-            user = crud.user.get(db, id=int(user_id))
-            if user:
-                return user
-        except (ValueError, TypeError):
-            pass
-
-    # Fall back to username lookup
-    username = payload.get("username")
-    if username:
-        user = crud.user.get_by_username(db, username=username)
-        return user
-
-    return None
-
-
-# Cookie utilities for persistent sessions
-def set_refresh_token_cookie(
-    response: Response, refresh_token: str, persistent: bool = False
-) -> None:
-    """Set refresh token in HTTP-only cookie"""
-    max_age = None
-    if persistent:
-        max_age = settings.PERSISTENT_SESSION_EXPIRE_DAYS * 24 * 60 * 60  # Convert days to seconds
-    else:
-        max_age = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
-
     response.set_cookie(
         key=settings.COOKIE_NAME,
-        value=refresh_token,
+        value=token,
         max_age=max_age,
         httponly=settings.COOKIE_HTTPONLY,
         secure=settings.COOKIE_SECURE,
@@ -257,13 +89,13 @@ def set_refresh_token_cookie(
     )
 
 
-def get_refresh_token_from_cookie(request: Request) -> str | None:
-    """Get refresh token from HTTP-only cookie"""
+def get_session_token_from_cookie(request: Request) -> str | None:
+    """Extract the session token from the request cookie."""
     return request.cookies.get(settings.COOKIE_NAME)
 
 
-def clear_refresh_token_cookie(response: Response) -> None:
-    """Clear refresh token cookie (for logout)"""
+def clear_session_cookie(response: Response) -> None:
+    """Clear the session cookie."""
     response.delete_cookie(
         key=settings.COOKIE_NAME,
         httponly=settings.COOKIE_HTTPONLY,
@@ -271,38 +103,3 @@ def clear_refresh_token_cookie(response: Response) -> None:
         samesite=settings.COOKIE_SAMESITE,
         domain=settings.COOKIE_DOMAIN,
     )
-
-
-def create_persistent_token_response(
-    user_id: int, username: str, role: "UserRole", remember_me: bool = False
-) -> dict[str, Any]:
-    """Create a token response with optional persistent session support"""
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    # Use different refresh token expiration based on remember_me
-    if remember_me:
-        refresh_token_expires = timedelta(days=settings.PERSISTENT_SESSION_EXPIRE_DAYS)
-    else:
-        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    token_data = {
-        "sub": str(user_id),
-        "username": username,
-        "role": role,
-    }
-
-    access_token = create_access_token(data=token_data, expires_delta=access_token_expires)
-
-    refresh_token = create_access_token(
-        data={"sub": str(user_id), "type": "refresh"},
-        expires_delta=refresh_token_expires,
-    )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
-        "user_id": user_id,
-        "role": role,
-        "refresh_token": refresh_token,
-    }

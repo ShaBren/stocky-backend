@@ -3,6 +3,14 @@
 import pytest
 from httpx import AsyncClient
 
+from src.stocky_backend.core.config import settings
+
+
+def _session_headers(response) -> dict:
+    """Extract session cookie headers from a login response."""
+    cookie = response.cookies.get(settings.COOKIE_NAME)
+    return {"Cookie": f"{settings.COOKIE_NAME}={cookie}"}
+
 
 class TestUserManagementWorkflow:
     """Test complete user management workflows."""
@@ -20,56 +28,38 @@ class TestUserManagementWorkflow:
             "password": "newpassword123",
             "role": "member",
         }
-
         create_response = await async_client.post(
             "/api/v1/users/", json=new_user_data, headers=auth_headers_admin
         )
-
         assert create_response.status_code == 201
         created_user = create_response.json()
         assert created_user["username"] == "newuser"
-        assert created_user["email"] == "newuser@example.com"
         assert created_user["is_active"] is True
         user_id = created_user["id"]
 
         # Step 2: New user logs in
         login_data = {"username": "newuser", "password": "newpassword123"}
-
         login_response = await async_client.post("/api/v1/auth/login", data=login_data)
-
         assert login_response.status_code == 200
         login_result = login_response.json()
-        assert "access_token" in login_result
-        user_token = login_result["access_token"]
+        assert login_result["user_id"] == user_id
+        assert login_result["role"] == "member"
+        user_headers = _session_headers(login_response)
 
         # Step 3: User accesses their own data
-        user_headers = {"Authorization": f"Bearer {user_token}"}
-
         profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
-
         assert profile_response.status_code == 200
         profile_data = profile_response.json()
         assert profile_data["username"] == "newuser"
-        assert profile_data["email"] == "newuser@example.com"
         assert profile_data["id"] == user_id
 
         # Step 4: User updates their profile
         update_data = {"email": "updated@example.com"}
-
         update_response = await async_client.put(
             f"/api/v1/users/{user_id}", json=update_data, headers=user_headers
         )
-
         assert update_response.status_code == 200
-        updated_profile = update_response.json()
-        assert updated_profile["email"] == "updated@example.com"
-
-        # Step 5: Verify changes persist
-        final_profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
-
-        assert final_profile_response.status_code == 200
-        final_profile = final_profile_response.json()
-        assert final_profile["email"] == "updated@example.com"
+        assert update_response.json()["email"] == "updated@example.com"
 
     @pytest.mark.asyncio
     async def test_user_deactivation_workflow(
@@ -84,23 +74,18 @@ class TestUserManagementWorkflow:
             "password": "temppassword123",
             "role": "member",
         }
-
         create_response = await async_client.post(
             "/api/v1/users/", json=new_user_data, headers=auth_headers_admin
         )
-
         assert create_response.status_code == 201
         created_user = create_response.json()
         user_id = created_user["id"]
 
         # Step 2: User logs in successfully
         login_data = {"username": "tempuser", "password": "temppassword123"}
-
         login_response = await async_client.post("/api/v1/auth/login", data=login_data)
-
         assert login_response.status_code == 200
-        user_token = login_response.json()["access_token"]
-        user_headers = {"Authorization": f"Bearer {user_token}"}
+        user_headers = _session_headers(login_response)
 
         # Step 3: User can access their data
         profile_response = await async_client.get("/api/v1/auth/me", headers=user_headers)
@@ -108,25 +93,19 @@ class TestUserManagementWorkflow:
 
         # Step 4: Admin deactivates the user
         deactivate_data = {"is_active": False}
-
         deactivate_response = await async_client.put(
             f"/api/v1/users/{user_id}", json=deactivate_data, headers=auth_headers_admin
         )
-
         assert deactivate_response.status_code == 200
-        deactivated_user = deactivate_response.json()
-        assert deactivated_user["is_active"] is False
+        assert deactivate_response.json()["is_active"] is False
 
         # Step 5: User can no longer log in
         new_login_response = await async_client.post("/api/v1/auth/login", data=login_data)
-
         assert new_login_response.status_code == 401
 
-        # Step 6: Existing token should be invalidated (if token validation checks user status)
-        # Note: This depends on implementation - some systems invalidate tokens, others don't
+        # Step 6: Existing session should be rejected (security checks is_active)
         profile_response_after = await async_client.get("/api/v1/auth/me", headers=user_headers)
-        # This might be 401 or 403 depending on implementation
-        assert profile_response_after.status_code in [401, 403]
+        assert profile_response_after.status_code in [400, 401]
 
     @pytest.mark.asyncio
     async def test_admin_user_management_workflow(

@@ -19,22 +19,18 @@ class BaseSchema(BaseModel):
 
 # Authentication schemas
 class Token(BaseModel):
-    """JWT token response"""
+    """JWT token response (legacy — sessions are now the primary auth method)"""
 
     access_token: str
     token_type: str = "bearer"
-    expires_in: int
+
+
+class SessionResponse(BaseModel):
+    """Session-based login response — no tokens in body, auth is via httpOnly cookie."""
+
     user_id: int
+    username: str
     role: UserRole
-    refresh_token: str
-
-
-class TokenData(BaseModel):
-    """Token payload data"""
-
-    user_id: int | None = None
-    username: str | None = None
-    role: UserRole | None = None
 
 
 class LoginRequest(BaseModel):
@@ -43,6 +39,13 @@ class LoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
     remember_me: bool = Field(default=False, description="Enable persistent session with cookies")
+
+
+class PasswordChange(BaseModel):
+    """Password change request"""
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
 
 
 class UserCreate(BaseModel):

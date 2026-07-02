@@ -1,97 +1,79 @@
 """
-Security dependencies for FastAPI authentication and authorization
+Security dependencies for FastAPI authentication and authorization.
 """
 
-from fastapi import Depends, HTTPException, Security, status
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
-from ..core.auth import verify_token_payload
+from ..core.auth import get_session_token_from_cookie
+from ..crud.crud import session as session_crud
 from ..db.database import get_db
 from ..models.models import User, UserRole
 
 # Security schemes
-bearer_scheme = HTTPBearer(auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-async def get_current_user_from_token(
+async def get_current_user_from_session(
+    request: Request,
     db: Session = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
 ) -> User | None:
-    """Get current user from JWT token"""
-    if not credentials:
+    """Get current user from session cookie."""
+    token = get_session_token_from_cookie(request)
+    if not token:
         return None
-
-    # Verify the token
-    payload = verify_token_payload(credentials.credentials)
-
-    # Extract user data
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Get user from database
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
+    return session_crud.get_user_by_token(db, token)
 
 
 async def get_current_user_from_api_key(
-    db: Session = Depends(get_db), api_key: str | None = Security(api_key_header)
+    db: Session = Depends(get_db),
+    api_key: str | None = Security(api_key_header),
 ) -> User | None:
-    """Get current user from API key"""
+    """Get current user from API key header."""
     if not api_key:
         return None
-
-    # Get user from database by API key
     user = db.query(User).filter(User.api_key == api_key).first()
     if user is None or not user.is_active:
         return None
-
     return user
 
 
 async def get_current_user(
-    token_user: User | None = Depends(get_current_user_from_token),
+    session_user: User | None = Depends(get_current_user_from_session),
     api_key_user: User | None = Depends(get_current_user_from_api_key),
 ) -> User:
-    """Get current user from either JWT token or API key"""
-    user = token_user or api_key_user
-
+    """Get current user from session cookie or API key."""
+    user = session_user or api_key_user
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
         )
-
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user",
+        )
     return user
 
 
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Get current active user (already checked in get_current_user)"""
+    """Get current active user."""
     return current_user
 
 
 async def get_current_user_optional(
-    token_user: User | None = Depends(get_current_user_from_token),
+    session_user: User | None = Depends(get_current_user_from_session),
     api_key_user: User | None = Depends(get_current_user_from_api_key),
 ) -> User | None:
-    """Get current user if authenticated, but don't require authentication"""
-    return token_user or api_key_user
+    """Get current user if authenticated, but don't require authentication."""
+    user = session_user or api_key_user
+    if user and not user.is_active:
+        return None
+    return user
 
 
 def require_roles(allowed_roles: list[UserRole]):

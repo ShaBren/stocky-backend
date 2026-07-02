@@ -2,6 +2,9 @@
 CRUD operations for database models
 """
 
+import hashlib
+from datetime import UTC, datetime
+
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
@@ -9,12 +12,14 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..core.auth import hash_password
+from ..core.config import settings
 from ..models.models import (
     SKU,
     Alert,
     Item,
     Location,
     LogEntry,
+    Session as SessionModel,
     ShoppingList,
     ShoppingListItem,
     ShoppingListLog,
@@ -739,3 +744,105 @@ sku = SKUCRUD()
 alert = AlertCRUD()
 log = LogEntryCRUD()
 shopping_list = ShoppingListCRUD()
+
+
+class SessionCRUD:
+    """CRUD operations for session-based authentication."""
+
+    def __init__(self):
+        self.model = SessionModel
+
+    @staticmethod
+    def _hash_token(token: str) -> str:
+        """Hash a session token with SHA-256 for storage."""
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    def create(self, db: Session, *, user_id: int, is_persistent: bool = False) -> str:
+        """Create a new session. Returns the raw token (only shown once)."""
+        import secrets
+
+        raw_token = secrets.token_hex(32)  # 64-char hex string
+        token_hash = self._hash_token(raw_token)
+
+        expires_delta = (
+            settings.PERSISTENT_SESSION_EXPIRE_DAYS
+            if is_persistent
+            else settings.SESSION_EXPIRE_HOURS / 24
+        )
+        from datetime import timedelta
+
+        expires_at = datetime.now(UTC) + timedelta(days=expires_delta)
+
+        session = SessionModel(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            is_persistent=is_persistent,
+        )
+        db.add(session)
+        db.commit()
+        return raw_token
+
+    def get_user_by_token(self, db: Session, raw_token: str) -> User | None:
+        """Look up a user by raw session token. Returns None if expired or not found."""
+        token_hash = self._hash_token(raw_token)
+        session = (
+            db.query(SessionModel)
+            .filter(SessionModel.token_hash == token_hash)
+            .first()
+        )
+        if not session:
+            return None
+        # Compare with UTC, but handle SQLite's naive datetimes
+        now = datetime.now(UTC)
+        expires = session.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if expires < now:
+            db.delete(session)
+            db.commit()
+            return None
+        return db.query(User).filter(User.id == session.user_id).first()
+
+    def delete(self, db: Session, raw_token: str) -> bool:
+        """Delete a session by raw token. Returns True if found and deleted."""
+        token_hash = self._hash_token(raw_token)
+        session = (
+            db.query(SessionModel)
+            .filter(SessionModel.token_hash == token_hash)
+            .first()
+        )
+        if session:
+            db.delete(session)
+            db.commit()
+            return True
+        return False
+
+    def delete_all_for_user(self, db: Session, user_id: int) -> int:
+        """Delete all sessions for a user. Returns count deleted."""
+        count = (
+            db.query(SessionModel)
+            .filter(SessionModel.user_id == user_id)
+            .delete()
+        )
+        db.commit()
+        return count
+
+    def cleanup_expired(self, db: Session) -> int:
+        """Delete all expired sessions. Returns count deleted."""
+        now = datetime.now(UTC)
+        # Handle SQLite naive datetimes by comparing with now.replace(tzinfo=None)
+        sessions = db.query(SessionModel).all()
+        count = 0
+        for s in sessions:
+            expires = s.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
+            if expires < now:
+                db.delete(s)
+                count += 1
+        db.commit()
+        return count
+
+
+session = SessionCRUD()

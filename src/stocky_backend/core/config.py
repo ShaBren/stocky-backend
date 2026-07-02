@@ -17,13 +17,13 @@ class Settings(BaseSettings):
 
     # Security settings
     SECRET_KEY: str = "your-secret-key-change-this-in-production"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    PERSISTENT_SESSION_EXPIRE_DAYS: int = 30
-    ALGORITHM: str = "HS256"
 
-    # Cookie settings for persistent sessions
-    COOKIE_NAME: str = "stocky_refresh_token"
+    # Session settings
+    SESSION_EXPIRE_HOURS: int = 24  # Standard session lifetime
+    PERSISTENT_SESSION_EXPIRE_DAYS: int = 30  # "Remember me" lifetime
+
+    # Cookie settings for session auth
+    COOKIE_NAME: str = "stocky_session"
     COOKIE_SECURE: bool = False  # Set to True in production with HTTPS
     COOKIE_HTTPONLY: bool = True
     COOKIE_SAMESITE: str = "lax"  # "lax", "strict", or "none"
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+pysqlite:///./data/stocky.db"
 
     # CORS settings
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
 
     # UDA (Universal Data Application) settings
     UDA_BASE_URL: str | None = None
