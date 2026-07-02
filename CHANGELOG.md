@@ -5,6 +5,46 @@ All notable changes to Stocky Backend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-01
+
+### Fixed
+- **Backup**: Use session-bound engine (`db.get_bind()`) for SQLAlchemy inspector instead of global engine
+- **Security scan**: Add `# noqa: S608` annotations for safe table-name SQL construction in backup endpoints ✨ Fixed by @github-actions
+
+## [0.3.0] - 2026-07-01 — The Architecture Refactor
+
+### Changed
+- **Auth**: JWT token auth → database-backed session cookies (httpOnly, sameSite=lax)
+  - New `sessions` table with SHA-256 token hashing
+  - `POST /auth/login` returns `{user_id, role, username}` — no tokens in body
+  - `POST /auth/refresh` removed (sessions handle persistence natively)
+  - `POST /auth/change-password` — dedicated password change endpoint
+  - API keys via `X-API-Key` header unchanged for programmatic access
+- **Scanner**: Full command processing state machine
+  - `POST /scanner/scan` parses command JSON (`set_mode`, `set_location`, `associate_ui`)
+  - Scanner state persisted in `User.scanner_state` JSON column
+  - Mode-aware UPC processing: add/remove/move/lookup
+  - `POST /scanner/reset/{scanner_id}`, `POST /qr/command` (QR code generation)
+  - In-memory `scanner_associations` dict removed
+- **Backup**: SQLite-only `sqlite3` CLI → database-agnostic JSON export/import
+  - 6 endpoints → 3: `GET /backup/download`, `POST /backup/restore`, `GET /backup/status`
+  - Export: SQLAlchemy queries all tables → JSON → gzip → stream
+  - Import: parse `.json.gz`, mode=merge (additive) or replace (destructive)
+  - Works with SQLite **and** PostgreSQL — no subprocess/shell commands
+- **Users**: DELETE is now soft-delete (`is_active=False`) matching the response message
+- **Config**: `ACCESS_TOKEN_EXPIRE_MINUTES`/`ALGORITHM`/etc → `SESSION_EXPIRE_HOURS` + `PERSISTENT_SESSION_EXPIRE_DAYS`
+
+### Added
+- `qrcode` dependency for command QR code generation
+- `localhost:5173` to default CORS origins (Vite dev server)
+- `SessionResponse`, `PasswordChange`, `ScannerCommand`, `QRCommandRequest`, `BackupExport` schemas
+
+### Removed
+- All JWT token creation/verification functions from `core/auth.py`
+- `python-jose` / `PyJWT` dependency (no longer needed for auth)
+- `subprocess` calls from backup (sqlite3, cp)
+- `POST /auth/refresh` endpoint
+
 ## [0.2.6] - 2026-07-01
 
 ### Fixed
